@@ -25,7 +25,20 @@ The single-vendor store was converted into **Mtindo**, a multi-vendor marketplac
 - **Unit (97):** settlement and commission resolution, refund splits, proportional allocation, promotions (scope, windows, caps, no stacking), marketplace totals (coupon after promotions, free delivery, inclusive VAT), delivery availability (coverage, towns, EAT cut-off, free-over, pickup), split-order status, KES/date/phone formatting, locale negotiation, Kiswahili dictionary completeness.
 - **Integration (60, real Postgres):** multi-seller checkout with per-seller commission; a balanced ledger on payment; idempotent settlement; platform-funded coupons absorbed by the platform; checkout refused for uncovered counties (pickup still offered); seller isolation (foreign product edit and fulfilment → 404; pending sellers blocked); visibility of unapproved listings and suspended sellers; earnings release after the hold; payout reservation, overdraw rejection, KYC (accepted national ID) and a reference required before paying, wallets reconciling to the ledger; refunds reversing commission; C2B validation (account, amount), receipt idempotency, unmatched payments parked; permissions for finance, content, support and seller roles.
 - **Seed:** run against a fresh database. It produced 47 counties, 7 sellers and 27 products, plus 81 multi-seller orders settled through `settlePaidOrder`. All 8 wallets reconciled to the ledger, which balanced. A re-run is idempotent.
-- **E2E:** see the run recorded below.
+- **E2E (42 Playwright runs, all passing across desktop, Pixel 7 touch and WebGL disabled):**
+  - Kenyan guest checkout (county, town, estate; per-seller delivery; sandbox payment) to a paid `MT-…` order;
+  - a two-designer bag requiring a delivery choice per designer, including the Nairobi same-day rider;
+  - validation, and declined-payment retry via pickup;
+  - product pages showing the seller, KES prices, a delivery check for a remote county and the illustrative-3D notice;
+  - designer directory filtered by county;
+  - Kiswahili switch and Lite mode;
+  - the seller dashboard, and sellers blocked from `/admin`;
+  - a 404 for foreign seller orders;
+  - customers without a store sent to onboarding;
+  - the admin seller queue and finance reconciliation;
+  - private documents never served from `/media`;
+  - all earlier storefront, auth, admin and showroom flows.
+- **Lint, typecheck, production build:** clean (`eslint`, `tsc --noEmit`, `next build`).
 
 ### Defects found and fixed (marketplace round)
 
