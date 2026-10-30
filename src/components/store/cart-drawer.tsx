@@ -33,6 +33,7 @@ export function CartLineRow({ line, currency, compact }: { line: CartLine; curre
           </div>
           <Price cents={line.lineTotalCents} currency={currency} className="text-sm" />
         </div>
+        {line.promotionDiscountCents > 0 && <p className="mt-1 text-xs text-clay">{line.promotionName}: −{formatMoney(line.promotionDiscountCents, currency)}</p>}
         {line.available < line.quantity && <p className="mt-2 text-xs text-danger">{line.available === 0 ? "Sold out" : `Only ${line.available} left`}</p>}
         <div className="mt-auto flex items-center justify-between pt-3">
           <div className="flex items-center border" aria-label={`Quantity for ${line.name}`}>
@@ -76,14 +77,12 @@ export function CartDrawer() {
       footer={
         cart && cart.lines.length > 0 ? (
           <div className="space-y-4">
-            {cart.freeShippingRemainingCents ? (
-              <p className="text-xs text-taupe">Spend {formatMoney(cart.freeShippingRemainingCents, cart.currency)} more for complimentary delivery.</p>
-            ) : null}
+            {cart.groups.length > 1 && <p className="text-xs text-taupe">From {cart.groups.length} designers — each delivers separately.</p>}
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatMoney(cart.subtotalCents - cart.discountCents, cart.currency)}</span>
             </div>
-            <p className="text-xs text-taupe">Shipping and taxes calculated at checkout.</p>
+            <p className="text-xs text-taupe">Delivery calculated at checkout. Prices include VAT.</p>
             <div className="grid grid-cols-2 gap-2">
               <Button asChild variant="outline" onClick={() => setOpen(false)}>
                 <Link href="/cart">View bag</Link>

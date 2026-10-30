@@ -5,7 +5,10 @@ import { AppError, badRequest, notFound, rateLimited } from "@/lib/errors";
 import { limitBy } from "@/lib/security/rate-limit";
 import type { RequestContext } from "@/lib/security/request";
 import type { AuthUser } from "@/lib/auth/guards";
-import { computeTotals, generateOrderNumber } from "@/features/orders/pricing";
+import { computeMarketplaceTotals, generateOrderNumber } from "@/features/orders/pricing";
+import { resolveCommissionBps, settleSellerOrder } from "@/features/finance/settlement";
+import type { AddressSnapshot } from "@/features/delivery/address";
+import { normaliseKenyanPhone } from "@/lib/utils";
 import { canTransition, ORDER_STATUS_LABEL } from "@/features/orders/state-machine";
 import { enqueue } from "@/server/jobs/queue";
 import { buildCartView, clearCart, getRawCart } from "./cart.service";
@@ -13,6 +16,7 @@ import { commitSale, releaseStock, reserveStock, returnStock } from "./inventory
 import { notify } from "./notification.service";
 import { audit } from "./audit.service";
 import { invalidateCatalogCache } from "./catalog.service";
+import { settlePaidOrder } from "./finance.service";
 import type { OrderStatus, Prisma } from "@/generated/prisma/client";
 import type { z } from "zod";
 import type { checkoutSchema } from "@/lib/validation/checkout";
@@ -25,11 +29,26 @@ export async function appendStatus(tx: Tx, orderId: string, from: OrderStatus | 
   await tx.orderStatusHistory.create({ data: { orderId, fromStatus: from, toStatus: to, actorId, note } });
 }
 
+async function resolveAddress(input: CheckoutData, user: AuthUser | null): Promise<AddressSnapshot & { countyId: string }> {
+  if (input.savedAddressId) {
+    if (!user) throw badRequest("Sign in to use a saved address");
+    const addr = await db.address.findFirst({ where: { id: input.savedAddressId, userId: user.id, deletedAt: null }, include: { county: true } });
+    if (!addr) throw notFound("Address");
+    if (!addr.countyId) throw new AppError("VALIDATION", "Please update this address with its county", { savedAddressId: ["Add a county to this address"] });
+    return { fullName: addr.fullName, phone: addr.phone, countyId: addr.countyId, county: addr.county?.name, town: addr.town ?? addr.city, estate: addr.estate, building: addr.building, line1: addr.line1, directions: addr.directions, country: addr.country };
+  }
+  const a = input.address!;
+  const county = await db.county.findUnique({ where: { id: a.countyId } });
+  if (!county || !county.isActive) throw new AppError("VALIDATION", "Choose a valid county", { "address.countyId": ["Choose a valid county"] });
+  return { fullName: a.fullName, phone: a.phone, countyId: county.id, county: county.name, town: a.town, estate: a.estate, building: a.building || null, line1: a.line1 || null, directions: a.directions || null, country: "KE" };
+}
+
 /**
- * Creates an order from the server-side cart. Prices, discounts, shipping and tax are all
- * recomputed from the database — nothing price-related is accepted from the client.
- * Stock is reserved atomically; the reservation expires if payment never completes.
- * Idempotent per `idempotencyKey`, so double-submits return the same order.
+ * Creates a marketplace order from the server-side cart: one parent Order (what the customer
+ * pays) split into one SellerOrder per seller (what each seller fulfils and is paid for).
+ * Prices, promotions, coupons, delivery fees, commission and tax are all recomputed from the
+ * database — the client only submits choices. Stock is reserved atomically; the reservation
+ * expires if payment never completes. Idempotent per `idempotencyKey`.
  */
 export async function placeOrder(input: CheckoutData, user: AuthUser | null, ctx: RequestContext) {
   const rl = await limitBy("checkout", user?.id ?? ctx.ip);
@@ -38,34 +57,38 @@ export async function placeOrder(input: CheckoutData, user: AuthUser | null, ctx
   const existing = await db.order.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
   if (existing) return existing;
 
+  const address = await resolveAddress(input, user);
   const cart = await getRawCart();
-  const view = await buildCartView(cart, input.shippingMethod);
+  const view = await buildCartView(cart, { countyId: address.countyId, town: address.town, selections: input.delivery });
   if (!cart || view.lines.length === 0) throw badRequest("Your bag is empty");
   if (view.issues.length) throw new AppError("OUT_OF_STOCK", view.issues.join(". "));
-
-  let shippingAddress: Prisma.InputJsonValue;
-  if (input.shippingMethod === "pickup") {
-    shippingAddress = { pickup: true, fullName: input.customerName, phone: input.phone };
-  } else if (input.savedAddressId) {
-    if (!user) throw badRequest("Sign in to use a saved address");
-    const addr = await db.address.findFirst({ where: { id: input.savedAddressId, userId: user.id, deletedAt: null } });
-    if (!addr) throw notFound("Address");
-    shippingAddress = { fullName: addr.fullName, phone: addr.phone, line1: addr.line1, line2: addr.line2, city: addr.city, region: addr.region, postalCode: addr.postalCode, country: addr.country };
-  } else {
-    shippingAddress = { ...input.address! };
+  const undeliverable = view.groups.filter((g) => !g.selected);
+  if (undeliverable.length) {
+    const g = undeliverable[0]!;
+    throw new AppError(
+      "VALIDATION",
+      g.deliveryOptions.length ? `Choose a delivery option for ${g.sellerName}` : `${g.sellerName} doesn't deliver to ${address.town}, ${address.county} yet — remove their items or use another address`,
+      { [`delivery.${g.sellerId}`]: ["Choose a delivery option"] },
+    );
   }
 
   const e = env();
+  const sellers = await db.seller.findMany({ where: { id: { in: view.groups.map((g) => g.sellerId) } }, select: { id: true, commissionRateBps: true } });
+  const categories = await db.category.findMany({ where: { id: { in: [...new Set(view.lines.map((l) => l.categoryId))] } }, select: { id: true, commissionRateBps: true } });
+  const sellerRate = new Map(sellers.map((x) => [x.id, x.commissionRateBps]));
+  const categoryRate = new Map(categories.map((c) => [c.id, c.commissionRateBps]));
+
   const order = await db.$transaction(async (tx) => {
     const coupon = cart.couponCode ? await tx.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
     if (coupon && user?.id && coupon.perUserLimit) {
       const used = await tx.couponRedemption.count({ where: { couponId: coupon.id, userId: user.id } });
       if (used >= coupon.perUserLimit) throw badRequest("You've already used this discount code");
     }
-    const totals = computeTotals({
+    const totals = computeMarketplaceTotals({
       lines: view.lines.map((l) => ({ unitPriceCents: l.unitPriceCents, quantity: l.quantity })),
-      shippingMethod: input.shippingMethod,
+      promotionDiscountCents: view.promotionDiscountCents,
       coupon,
+      shippingCents: view.groups.reduce((s, g) => s + g.selected!.priceCents, 0),
       taxRateBps: e.TAX_RATE_BPS,
       taxInclusive: e.TAX_INCLUSIVE,
     });
@@ -77,7 +100,7 @@ export async function placeOrder(input: CheckoutData, user: AuthUser | null, ctx
         userId: user?.id ?? null,
         email: input.email,
         customerName: input.customerName,
-        phone: input.phone,
+        phone: normaliseKenyanPhone(input.phone) ?? input.phone,
         currency: e.STORE_CURRENCY,
         subtotalCents: totals.subtotalCents,
         discountCents: totals.discountCents,
@@ -85,26 +108,59 @@ export async function placeOrder(input: CheckoutData, user: AuthUser | null, ctx
         taxCents: totals.taxCents,
         totalCents: totals.totalCents,
         couponCode: totals.couponCode,
-        shippingMethod: input.shippingMethod,
-        shippingAddress,
+        shippingMethod: view.groups.length === 1 ? view.groups[0]!.selected!.name : `${view.groups.length} deliveries`,
+        shippingAddress: address as unknown as Prisma.InputJsonObject,
+        countyId: address.countyId,
         notes: input.notes,
         idempotencyKey: input.idempotencyKey,
         reservationExpiresAt: new Date(Date.now() + RESERVATION_MINUTES * 60_000),
-        items: {
-          create: view.lines.map((l) => ({
-            productId: l.productId,
-            variantId: l.variantId,
-            productName: l.name,
-            variantLabel: `${l.color} / ${l.size}`,
-            sku: l.sku,
-            imageUrl: l.image,
-            unitPriceCents: l.unitPriceCents,
-            quantity: l.quantity,
-            totalCents: l.lineTotalCents,
-          })),
-        },
       },
     });
+
+    for (const g of view.groups) {
+      const opt = g.selected!;
+      // Commission per line (category rates may differ), seller override wins.
+      let commissionCents = 0;
+      let baseCents = 0;
+      for (const l of g.lines) {
+        const rate = resolveCommissionBps(sellerRate.get(g.sellerId), categoryRate.get(l.categoryId), e.DEFAULT_COMMISSION_BPS);
+        const s = settleSellerOrder({ merchandiseCents: l.lineTotalCents, sellerDiscountCents: l.sellerFunded ? l.promotionDiscountCents : 0, shippingCents: 0, rateBps: rate });
+        commissionCents += s.commissionCents;
+        baseCents += s.baseCents;
+      }
+      await tx.sellerOrder.create({
+        data: {
+          orderId: created.id,
+          sellerId: g.sellerId,
+          subtotalCents: g.merchandiseCents,
+          discountCents: g.sellerFundedDiscountCents,
+          shippingCents: opt.priceCents,
+          totalCents: g.merchandiseCents - g.sellerFundedDiscountCents + opt.priceCents,
+          commissionCents,
+          sellerNetCents: baseCents - commissionCents + opt.priceCents,
+          shippingMethodId: opt.methodId,
+          shippingMethodName: opt.name,
+          deliveryType: opt.type,
+          etaMinDays: opt.etaMinDays,
+          etaMaxDays: opt.etaMaxDays,
+          items: {
+            create: g.lines.map((l) => ({
+              orderId: created.id,
+              sellerId: g.sellerId,
+              productId: l.productId,
+              variantId: l.variantId,
+              productName: l.name,
+              variantLabel: `${l.color} / ${l.size}`,
+              sku: l.sku,
+              imageUrl: l.image,
+              unitPriceCents: l.unitPriceCents,
+              quantity: l.quantity,
+              totalCents: l.lineTotalCents,
+            })),
+          },
+        },
+      });
+    }
 
     for (const l of view.lines) await reserveStock(tx, l.variantId, l.quantity, created.id, `${l.name} (${l.size})`);
 
@@ -119,9 +175,26 @@ export async function placeOrder(input: CheckoutData, user: AuthUser | null, ctx
     await appendStatus(tx, created.id, null, "PENDING_PAYMENT", user?.id ?? null, "Order placed");
     await clearCart(cart.id, tx);
 
-    if (user && input.saveAddress && input.address && input.shippingMethod !== "pickup") {
+    if (user && input.saveAddress && input.address) {
+      const a = input.address;
       const count = await tx.address.count({ where: { userId: user.id, deletedAt: null } });
-      await tx.address.create({ data: { ...input.address, userId: user.id, isDefault: count === 0, line2: input.address.line2 || null, region: input.address.region || null, postalCode: input.address.postalCode || null } });
+      await tx.address.create({
+        data: {
+          userId: user.id,
+          isDefault: count === 0,
+          fullName: a.fullName,
+          phone: a.phone,
+          countyId: address.countyId,
+          town: a.town,
+          estate: a.estate,
+          building: a.building || null,
+          directions: a.directions || null,
+          line1: a.line1 || a.estate,
+          city: a.town,
+          region: address.county,
+          country: "KE",
+        },
+      });
     }
 
     await enqueue("orders.expireReservations", {}, { tx, runAt: new Date(Date.now() + (RESERVATION_MINUTES + 1) * 60_000) });
@@ -142,8 +215,10 @@ export async function fulfilPayment(paymentId: string, evidence: { amountCents?:
     if (!payment) throw notFound("Payment");
     if (payment.status === "SUCCEEDED") return { alreadyProcessed: true, order: payment.order };
 
-    if (evidence.amountCents != null && evidence.amountCents !== payment.amountCents) {
-      throw new AppError("PAYMENT", `Amount mismatch: expected ${payment.amountCents}, received ${evidence.amountCents}`);
+    // M-Pesa only moves whole shillings (we charge the total rounded up), so compare at that precision.
+    const expected = payment.provider === "MPESA" ? Math.ceil(payment.amountCents / 100) * 100 : payment.amountCents;
+    if (evidence.amountCents != null && evidence.amountCents !== expected) {
+      throw new AppError("PAYMENT", `Amount mismatch: expected ${expected}, received ${evidence.amountCents}`);
     }
     if (evidence.currency && evidence.currency.toUpperCase() !== payment.currency) {
       throw new AppError("PAYMENT", "Currency mismatch");
@@ -165,6 +240,7 @@ export async function fulfilPayment(paymentId: string, evidence: { amountCents?:
       await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paymentStatus: "PAID", paidAt: new Date(), reservationExpiresAt: null } });
       await appendStatus(tx, order.id, "PENDING_PAYMENT", "PAID", null, `Payment confirmed via ${payment.provider}`);
       for (const item of order.items) if (item.productId) await tx.product.update({ where: { id: item.productId }, data: { salesCount: { increment: item.quantity } } });
+      await settlePaidOrder(tx, order.id);
       if (order.userId) await notify(order.userId, "ORDER_UPDATE", "Payment received", `Thank you — order ${order.number} is confirmed.`, `/account/orders/${order.number}`, tx);
       await enqueue("email.orderConfirmation", { orderId: order.id }, { tx });
       return { alreadyProcessed: false, order };
@@ -221,6 +297,7 @@ export async function expireStaleOrders(reconcile: (paymentId: string) => Promis
       if (!fresh || fresh.status !== "PENDING_PAYMENT") return false;
       await releaseOrderReservations(tx, order.id, "Reservation expired");
       await tx.order.update({ where: { id: order.id }, data: { status: "CANCELLED", cancelledAt: new Date(), reservationExpiresAt: null } });
+      await tx.sellerOrder.updateMany({ where: { orderId: order.id }, data: { status: "CANCELLED" } });
       await tx.payment.updateMany({ where: { orderId: order.id, status: { in: ["PENDING", "REQUIRES_ACTION"] } }, data: { status: "CANCELLED" } });
       await appendStatus(tx, order.id, "PENDING_PAYMENT", "CANCELLED", null, "Payment not completed in time");
       return true;
@@ -230,32 +307,17 @@ export async function expireStaleOrders(reconcile: (paymentId: string) => Promis
   return cancelled;
 }
 
+/** Staff fulfilment from the order page: applies the status to every seller order that can move. */
 export async function updateFulfilment(
-  input: { orderId: string; status: "PROCESSING" | "SHIPPED" | "DELIVERED"; note?: string; carrier?: string; trackingNumber?: string; trackingUrl?: string },
+  input: { orderId: string; sellerOrderId?: string; status: "PROCESSING" | "SHIPPED" | "DELIVERED"; note?: string; carrier?: string; trackingNumber?: string; trackingUrl?: string },
   actor: AuthUser,
 ) {
-  const order = await db.$transaction(async (tx) => {
-    const o = await tx.order.findUnique({ where: { id: input.orderId } });
-    if (!o) throw notFound("Order");
-    if (!canTransition(o.status, input.status)) throw badRequest(`Cannot move an order from ${ORDER_STATUS_LABEL[o.status]} to ${ORDER_STATUS_LABEL[input.status]}`);
-    await tx.order.update({ where: { id: o.id }, data: { status: input.status } });
-    await appendStatus(tx, o.id, o.status, input.status, actor.id, input.note || undefined);
-    if (input.status === "SHIPPED") {
-      await tx.shipment.create({
-        data: { orderId: o.id, carrier: input.carrier || "Courier", trackingNumber: input.trackingNumber || null, trackingUrl: input.trackingUrl || null, status: "IN_TRANSIT", shippedAt: new Date() },
-      });
-    }
-    if (input.status === "DELIVERED") {
-      await tx.shipment.updateMany({ where: { orderId: o.id, status: "IN_TRANSIT" }, data: { status: "DELIVERED", deliveredAt: new Date() } });
-    }
-    if (o.userId) {
-      const type = input.status === "PROCESSING" ? "ORDER_UPDATE" : "DELIVERY";
-      await notify(o.userId, type, `Order ${ORDER_STATUS_LABEL[input.status].toLowerCase()}`, `Order ${o.number} is now ${ORDER_STATUS_LABEL[input.status].toLowerCase()}.`, `/account/orders/${o.number}`, tx);
-    }
-    await enqueue("email.orderStatus", { orderId: o.id, status: input.status }, { tx });
-    return o;
-  });
-  await audit(actor.id, "order.status_updated", "Order", order.id, { to: input.status, tracking: input.trackingNumber });
+  const { updateSellerOrderStatus } = await import("./fulfilment.service");
+  const subs = await db.sellerOrder.findMany({ where: { orderId: input.orderId, ...(input.sellerOrderId ? { id: input.sellerOrderId } : {}) } });
+  if (!subs.length) throw notFound("Order");
+  const movable = subs.filter((s) => canTransition(s.status, input.status));
+  if (!movable.length) throw badRequest(`Nothing in this order can move to ${ORDER_STATUS_LABEL[input.status]}`);
+  for (const so of movable) await updateSellerOrderStatus({ ...input, sellerOrderId: so.id }, actor);
 }
 
 /** Cancels an unpaid order (releasing stock). Paid orders must go through refundOrder. */
@@ -266,6 +328,7 @@ export async function cancelOrder(orderId: string, reason: string, actor: AuthUs
     if (o.status !== "PENDING_PAYMENT") throw badRequest("Only unpaid orders can be cancelled directly — issue a refund for paid orders");
     await releaseOrderReservations(tx, o.id, `Cancelled: ${reason}`);
     await tx.order.update({ where: { id: o.id }, data: { status: "CANCELLED", cancelledAt: new Date(), reservationExpiresAt: null } });
+      await tx.sellerOrder.updateMany({ where: { orderId: o.id }, data: { status: "CANCELLED" } });
     await tx.payment.updateMany({ where: { orderId: o.id, status: { in: ["PENDING", "REQUIRES_ACTION"] } }, data: { status: "CANCELLED" } });
     await appendStatus(tx, o.id, o.status, "CANCELLED", actor?.id ?? null, reason);
     if (o.userId) await notify(o.userId, "ORDER_UPDATE", "Order cancelled", `Order ${o.number} has been cancelled.`, `/account/orders/${o.number}`, tx);

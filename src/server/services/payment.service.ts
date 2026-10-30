@@ -4,12 +4,16 @@ import { env } from "@/config/env";
 import { AppError, badRequest, notFound } from "@/lib/errors";
 import { logError, logger } from "@/lib/logger";
 import { randomToken } from "@/lib/security/crypto";
+import { formatMoney, maskPhone } from "@/lib/utils";
+import type { C2bPayload } from "@/features/payments/providers/mpesa-c2b";
 import type { AuthUser } from "@/lib/auth/guards";
 import { getAdapter } from "@/features/payments/registry";
 import { ProviderError, WebhookVerificationError, type VerifiedEvent, type WebhookRequest } from "@/features/payments/types";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 import { appendStatus, failPayment, fulfilPayment, returnStock } from "./order.service";
 import { audit } from "./audit.service";
+import { applySellerRefund } from "./finance.service";
+import { allocateProportionally } from "@/features/finance/settlement";
 import { notify } from "./notification.service";
 
 export interface PaymentNextStep {
@@ -54,7 +58,7 @@ export async function startPayment(orderId: string, provider: PaymentProvider, o
       customerEmail: order.email,
       customerName: order.customerName,
       phone: opts.phone ?? order.phone,
-      description: `Atelier order ${order.number} (${order.items.length} item${order.items.length === 1 ? "" : "s"})`,
+      description: `Mtindo order ${order.number} (${order.items.length} item${order.items.length === 1 ? "" : "s"})`,
       idempotencyKey: payment.idempotencyKey,
       appUrl: env().APP_URL,
     });
@@ -116,6 +120,10 @@ export async function processWebhook(provider: PaymentProvider, req: WebhookRequ
     if (event.outcome !== "ignored" && event.outcome !== "pending") {
       const payment = await resolvePayment(provider, event);
       if (!payment) throw new Error("No matching payment for event");
+      if (provider === "MPESA") {
+        const receipt = typeof event.metadata?.receipt === "string" ? event.metadata.receipt : null;
+        await recordProviderTransaction({ paymentId: payment.id, provider, type: "CALLBACK", status: event.outcome, providerReference: event.providerReference, receipt, amountCents: event.amountCents ?? null });
+      }
       if (event.outcome === "succeeded") {
         await fulfilPayment(payment.id, { amountCents: event.amountCents, currency: event.currency, metadata: event.metadata });
       } else {
@@ -147,10 +155,16 @@ export async function reconcilePayment(paymentId: string) {
   return status.outcome;
 }
 
-export async function refundOrder(input: { orderId: string; amountCents: number; reason: string; restock: boolean }, actor: AuthUser) {
+/**
+ * Refunds a customer. With `sellerOrderId` the refund is charged to that seller's part of the
+ * order (capped at what that seller order took); otherwise it is spread across seller orders
+ * in proportion to their totals. Each seller's share is split between the seller (debit) and
+ * the platform (commission reversal) in the ledger.
+ */
+export async function refundOrder(input: { orderId: string; sellerOrderId?: string; amountCents: number; reason: string; restock: boolean }, actor: AuthUser) {
   const order = await db.order.findUnique({
     where: { id: input.orderId },
-    include: { payments: { where: { status: { in: ["SUCCEEDED", "PARTIALLY_REFUNDED"] } } }, refunds: true, items: true },
+    include: { payments: { where: { status: { in: ["SUCCEEDED", "PARTIALLY_REFUNDED"] } } }, refunds: true, items: true, sellerOrders: true },
   });
   if (!order) throw notFound("Order");
   const payment = order.payments[0];
@@ -159,8 +173,23 @@ export async function refundOrder(input: { orderId: string; amountCents: number;
   const refundable = payment.amountCents - refunded;
   if (input.amountCents > refundable) throw new AppError("VALIDATION", `At most ${(refundable / 100).toFixed(2)} can be refunded`, { amount: ["Exceeds refundable amount"] });
 
+  // Work out which seller orders bear the refund.
+  const live = order.refunds.filter((r) => r.status !== "FAILED");
+  const refundedOn = (soId: string) => live.filter((r) => r.sellerOrderId === soId).reduce((s, r) => s + r.amountCents, 0);
+  let shares: { sellerOrderId: string; amountCents: number }[];
+  if (input.sellerOrderId) {
+    const so = order.sellerOrders.find((x) => x.id === input.sellerOrderId);
+    if (!so) throw notFound("Seller order");
+    const left = so.totalCents - refundedOn(so.id);
+    if (input.amountCents > left) throw new AppError("VALIDATION", `At most ${(left / 100).toFixed(2)} can be refunded for this seller`, { amount: ["Exceeds this seller's share"] });
+    shares = [{ sellerOrderId: so.id, amountCents: input.amountCents }];
+  } else {
+    const parts = allocateProportionally(input.amountCents, order.sellerOrders.map((so) => so.totalCents));
+    shares = order.sellerOrders.map((so, i) => ({ sellerOrderId: so.id, amountCents: parts[i]! })).filter((x) => x.amountCents > 0);
+  }
+
   const refund = await db.refund.create({
-    data: { paymentId: payment.id, orderId: order.id, amountCents: input.amountCents, reason: input.reason, actorId: actor.id, status: "PENDING" },
+    data: { paymentId: payment.id, orderId: order.id, sellerOrderId: shares.length === 1 ? shares[0]!.sellerOrderId : null, amountCents: input.amountCents, reason: input.reason, actorId: actor.id, status: "PENDING" },
   });
 
   let result;
@@ -181,11 +210,76 @@ export async function refundOrder(input: { orderId: string; amountCents: number;
     await tx.payment.update({ where: { id: payment.id }, data: { status: full ? "REFUNDED" : "PARTIALLY_REFUNDED" } });
     await tx.order.update({ where: { id: order.id }, data: { paymentStatus: full ? "REFUNDED" : "PARTIALLY_REFUNDED", ...(full ? { status: "REFUNDED" } : {}) } });
     if (full && order.status !== "REFUNDED") await appendStatus(tx, order.id, order.status, "REFUNDED", actor.id, input.reason);
-    if (input.restock && full && ["PAID", "PROCESSING"].includes(order.status)) {
-      for (const i of order.items) if (i.variantId) await returnStock(tx, i.variantId, i.quantity, order.id, actor.id, "Refunded before shipping");
+    for (const share of shares) {
+      await applySellerRefund(tx, { sellerOrderId: share.sellerOrderId, refundId: refund.id, amountCents: share.amountCents, actorId: actor.id });
+      const so = order.sellerOrders.find((x) => x.id === share.sellerOrderId)!;
+      const soFull = refundedOn(so.id) + share.amountCents >= so.totalCents;
+      if (soFull && so.status !== "REFUNDED") {
+        await tx.sellerOrder.update({ where: { id: so.id }, data: { status: "REFUNDED" } });
+        if (input.restock && ["PAID", "PROCESSING"].includes(so.status)) {
+          for (const i of order.items) if (i.variantId && i.sellerOrderId === so.id) await returnStock(tx, i.variantId, i.quantity, order.id, actor.id, "Refunded before shipping");
+        }
+      }
     }
-    if (order.userId) await notify(order.userId, "ORDER_UPDATE", "Refund issued", `A refund of ${(input.amountCents / 100).toFixed(2)} ${order.currency} was issued for ${order.number}.`, `/account/orders/${order.number}`, tx);
+    if (order.userId) await notify(order.userId, "ORDER_UPDATE", "Refund issued", `A refund of ${formatMoney(input.amountCents, order.currency)} was issued for ${order.number}.`, `/account/orders/${order.number}`, tx);
   });
   await audit(actor.id, "order.refunded", "Order", order.id, { amountCents: input.amountCents, provider: payment.provider, status: result.status });
   return result;
+}
+
+// ─── M-Pesa C2B (Paybill: account number = order number) ───────────────────────
+
+function kesToCents(amount: string | number) {
+  const n = typeof amount === "number" ? amount : Number(amount);
+  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
+}
+
+async function openOrderForAccount(account: string | undefined) {
+  const number = (account ?? "").trim().toUpperCase();
+  if (!/^MT-\d{6}-[A-Z0-9]{5}$/.test(number)) return null;
+  return db.order.findFirst({ where: { number, status: "PENDING_PAYMENT" } });
+}
+
+/** Validation: accept only payments for an open order with the exact (rounded-up) amount. */
+export async function validateC2b(p: C2bPayload): Promise<{ ok: boolean; code: string; reason: string }> {
+  const order = await openOrderForAccount(p.BillRefNumber);
+  if (!order) return { ok: false, code: "C2B00012", reason: "Invalid account number" };
+  const due = Math.ceil(order.totalCents / 100) * 100;
+  if (kesToCents(p.TransAmount) !== due) return { ok: false, code: "C2B00013", reason: "Invalid amount" };
+  return { ok: true, code: "0", reason: "Accepted" };
+}
+
+/**
+ * Confirmation: the money has moved. Recorded exactly once per TransID. If it matches an open
+ * order it is fulfilled; otherwise it is kept for finance to reconcile (refund or allocate).
+ */
+export async function confirmC2b(p: C2bPayload) {
+  if (!p.TransID || !/^[A-Z0-9]{8,20}$/i.test(p.TransID)) throw badRequest("Malformed confirmation");
+  const amountCents = kesToCents(p.TransAmount);
+  try {
+    await db.paymentTransaction.create({
+      data: { provider: "MPESA", type: "C2B_CONFIRMATION", status: "RECEIVED", receipt: p.TransID, phone: p.MSISDN ? maskPhone(`+${p.MSISDN}`) : null, amountCents: Number.isFinite(amountCents) ? amountCents : null, raw: { ...p, MSISDN: undefined, FirstName: undefined } as object },
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2002") return { duplicate: true };
+    throw err;
+  }
+  const order = await openOrderForAccount(p.BillRefNumber);
+  const due = order ? Math.ceil(order.totalCents / 100) * 100 : null;
+  if (!order || amountCents !== due) {
+    await db.paymentTransaction.updateMany({ where: { provider: "MPESA", type: "C2B_CONFIRMATION", receipt: p.TransID }, data: { status: "UNMATCHED" } });
+    await db.auditLog.create({ data: { action: "payment.c2b_unmatched", entityType: "PaymentTransaction", entityId: p.TransID, metadata: { account: p.BillRefNumber ?? null, amountCents } } });
+    return { matched: false };
+  }
+  const payment = await db.payment.create({
+    data: { orderId: order.id, provider: "MPESA", status: "PENDING", amountCents: order.totalCents, currency: order.currency, providerReference: p.TransID, idempotencyKey: `c2b_${p.TransID}`, metadata: { channel: "C2B", receipt: p.TransID } },
+  });
+  await db.paymentTransaction.updateMany({ where: { provider: "MPESA", type: "C2B_CONFIRMATION", receipt: p.TransID }, data: { paymentId: payment.id, status: "MATCHED" } });
+  await fulfilPayment(payment.id, { amountCents, currency: "KES", metadata: { receipt: p.TransID, channel: "C2B" } });
+  return { matched: true, orderId: order.id };
+}
+
+/** Records every provider interaction for reconciliation (receipts are unique per type). */
+export async function recordProviderTransaction(input: { paymentId?: string | null; provider: PaymentProvider; type: "INITIATE" | "CALLBACK" | "STATUS_QUERY"; status: string; providerReference?: string | null; receipt?: string | null; amountCents?: number | null; raw?: object }) {
+  await db.paymentTransaction.createMany({ data: [{ ...input, receipt: input.receipt ?? null }], skipDuplicates: true });
 }

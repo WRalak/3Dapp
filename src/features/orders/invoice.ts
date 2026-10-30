@@ -1,3 +1,4 @@
+import { addressLines } from "@/features/delivery/address";
 import { site } from "@/config/site";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -50,7 +51,7 @@ td{padding:12px 0;border-bottom:1px solid #e2dcd2;vertical-align:top}
 <div class="grid" style="margin-top:0"><div class="brand">${esc(site.name)}</div><div class="r"><h1>Invoice</h1><div class="muted">${esc(o.number)}</div></div></div>
 <div class="grid">
 <div><div class="muted">BILLED TO</div><p>${esc(o.customerName)}<br>${esc(o.email)}<br>${esc(o.phone)}</p></div>
-<div><div class="muted">DELIVER TO</div><p>${addr.pickup ? "Studio pickup" : [addr.line1, addr.line2, addr.city, addr.region, addr.postalCode, addr.country].filter(Boolean).map(esc).join("<br>")}</p></div>
+<div><div class="muted">DELIVER TO</div><p>${addr.pickup ? "Pickup" : addressLines(addr).map(esc).join("<br>")}</p></div>
 <div class="r"><div class="muted">DATE</div><p>${esc(formatDate(o.placedAt))}</p><div class="muted">PAYMENT</div><p>${esc(paid?.provider ?? "—")}${o.paidAt ? `<br>Paid ${esc(formatDate(o.paidAt))}` : ""}</p></div>
 </div>
 <table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Total</th></tr></thead><tbody>${rows}</tbody></table>

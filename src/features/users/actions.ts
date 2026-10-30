@@ -53,7 +53,24 @@ export const revokeOtherSessionsAction = action(z.object({}), async () => {
 
 export const saveAddressAction = action(addressSchema.extend({ id: z.string().optional() }), async ({ id, ...input }) => {
   const user = await requireUser();
-  const data = { ...input, label: blank(input.label), line2: blank(input.line2), region: blank(input.region), postalCode: blank(input.postalCode) };
+  const county = await db.county.findUnique({ where: { id: input.countyId } });
+  if (!county) throw new AppError("VALIDATION", "Choose a valid county", { countyId: ["Choose a valid county"] });
+  const data = {
+    label: blank(input.label),
+    fullName: input.fullName,
+    phone: input.phone,
+    countyId: county.id,
+    town: input.town,
+    estate: input.estate,
+    building: blank(input.building),
+    directions: blank(input.directions),
+    // Legacy columns kept populated for older readers.
+    line1: input.line1 || input.estate,
+    city: input.town,
+    region: county.name,
+    country: "KE",
+    isDefault: input.isDefault,
+  };
   await db.$transaction(async (tx) => {
     const count = await tx.address.count({ where: { userId: user.id, deletedAt: null } });
     const makeDefault = data.isDefault || count === 0;

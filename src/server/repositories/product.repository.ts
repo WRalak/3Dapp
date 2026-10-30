@@ -12,23 +12,31 @@ export const cardInclude = {
     where: { deletedAt: null, isActive: true },
     select: { color: true, colorHex: true, priceCents: true, salePriceCents: true, inventory: { select: { quantity: true, reserved: true } } },
   },
-  model3D: { select: { status: true, deletedAt: true } },
+  model3D: { select: { status: true, deletedAt: true, representation: true } },
+  seller: { select: { id: true, slug: true, businessName: true, town: true, county: { select: { name: true } } } },
 } satisfies Prisma.ProductInclude;
 
 export type CardRow = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
 
-export const publishedWhere = (): Prisma.ProductWhereInput => ({ status: "PUBLISHED", deletedAt: null });
+/** Storefront visibility: published, approved by moderation, and from an approved (not suspended) seller. */
+export const publishedWhere = (): Prisma.ProductWhereInput => ({
+  status: "PUBLISHED",
+  deletedAt: null,
+  approvalStatus: "APPROVED",
+  seller: { status: "APPROVED", deletedAt: null },
+});
 
 /** Full-text search with ranking; falls back to substring match for short/partial terms. */
 export async function searchProductIds(q: string, limit = 500): Promise<string[]> {
   const rows = await db.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "Product"
-    WHERE "deletedAt" IS NULL AND status = 'PUBLISHED'
+    SELECT p.id FROM "Product" p
+    JOIN "Seller" s ON s.id = p."sellerId" AND s.status = 'APPROVED' AND s."deletedAt" IS NULL
+    WHERE p."deletedAt" IS NULL AND p.status = 'PUBLISHED' AND p."approvalStatus" = 'APPROVED'
       AND (
-        product_search_document("name", "description", "tags") @@ websearch_to_tsquery('english', ${q})
-        OR "name" ILIKE ${"%" + q.replace(/[%_\\]/g, (c) => "\\" + c) + "%"}
+        product_search_document(p."name", p."description", p."tags") @@ websearch_to_tsquery('english', ${q})
+        OR p."name" ILIKE ${"%" + q.replace(/[%_\\]/g, (c) => "\\" + c) + "%"}
       )
-    ORDER BY ts_rank(product_search_document("name", "description", "tags"), websearch_to_tsquery('english', ${q})) DESC
+    ORDER BY ts_rank(product_search_document(p."name", p."description", p."tags"), websearch_to_tsquery('english', ${q})) DESC
     LIMIT ${limit}`;
   return rows.map((r) => r.id);
 }
@@ -38,6 +46,8 @@ export function buildProductWhere(f: ProductFilter, now = new Date()): Prisma.Pr
   if (f.category) and.push({ OR: [{ category: { slug: f.category } }, { category: { parent: { slug: f.category } } }] });
   if (f.collection) and.push({ collections: { some: { collection: { slug: f.collection } } } });
   if (f.brand.length) and.push({ brand: { slug: { in: f.brand } } });
+  if (f.seller) and.push({ seller: { slug: f.seller } });
+  if (f.county) and.push({ seller: { county: { slug: f.county } } });
   if (f.size.length || f.color.length) {
     and.push({
       variants: {

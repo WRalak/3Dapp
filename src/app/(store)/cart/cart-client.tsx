@@ -12,26 +12,33 @@ import { EmptyState, Skeleton } from "@/components/ui/misc";
 import { formatMoney } from "@/lib/utils";
 import type { CartView } from "@/types/cart";
 
-export function OrderSummary({ cart, children }: { cart: CartView; children?: React.ReactNode }) {
+export function OrderSummary({ cart, children, deliveryPending }: { cart: CartView; children?: React.ReactNode; deliveryPending?: boolean }) {
   const m = (c: number) => formatMoney(c, cart.currency);
+  const pending = deliveryPending ?? !cart.deliveryComplete;
   return (
     <div className="space-y-3 text-sm">
       <div className="flex justify-between">
         <span>Subtotal</span>
         <span className="tabular-nums">{m(cart.subtotalCents)}</span>
       </div>
-      {cart.discountCents > 0 && (
+      {cart.promotionDiscountCents > 0 && (
         <div className="flex justify-between text-clay">
-          <span>Discount ({cart.couponCode})</span>
-          <span className="tabular-nums">−{m(cart.discountCents)}</span>
+          <span>Offers</span>
+          <span className="tabular-nums">{m(-cart.promotionDiscountCents)}</span>
+        </div>
+      )}
+      {cart.couponDiscountCents > 0 && (
+        <div className="flex justify-between text-clay">
+          <span>Code {cart.couponCode}</span>
+          <span className="tabular-nums">{m(-cart.couponDiscountCents)}</span>
         </div>
       )}
       <div className="flex justify-between">
-        <span>Shipping</span>
-        <span className="tabular-nums">{cart.shippingCents ? m(cart.shippingCents) : "Free"}</span>
+        <span>Delivery{cart.groups.length > 1 ? ` (${cart.groups.length} sellers)` : ""}</span>
+        <span className="tabular-nums">{cart.freeShipping ? "Free" : pending ? "Calculated at checkout" : cart.shippingCents ? m(cart.shippingCents) : "Free"}</span>
       </div>
       <div className="flex justify-between">
-        <span>{cart.taxInclusive ? "Tax (included)" : "Tax"}</span>
+        <span>{cart.taxInclusive ? "VAT (included)" : "VAT"}</span>
         <span className="tabular-nums">{m(cart.taxCents)}</span>
       </div>
       <div className="flex justify-between border-t pt-4 text-base font-medium">
@@ -115,17 +122,31 @@ export function CartPageClient() {
             {cart.issues.join(". ")}. Please adjust quantities before checkout.
           </div>
         )}
-        <ul className="divide-y border-y">
-          {cart.lines.map((l) => (
-            <CartLineRow key={l.id} line={l} currency={cart.currency} />
+        <div className="space-y-8">
+          {cart.groups.map((g) => (
+            <section key={g.sellerId} aria-label={`Items from ${g.sellerName}`}>
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-medium">
+                  <Link href={`/designers/${g.sellerSlug}`} className="link-underline">
+                    {g.sellerName}
+                  </Link>
+                </h2>
+                <span className="text-xs text-taupe">{[g.sellerTown, g.sellerCounty].filter(Boolean).join(", ")} · ships separately</span>
+              </div>
+              <ul className="divide-y border-y">
+                {g.lines.map((l) => (
+                  <CartLineRow key={l.id} line={l} currency={cart.currency} />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       </div>
       <aside className="h-fit space-y-6 bg-surface p-6 lg:sticky lg:top-28 lg:col-span-4">
         <h2 className="eyebrow">Summary</h2>
         <CouponForm cart={cart} />
         <OrderSummary cart={cart} />
-        {cart.freeShippingRemainingCents ? <p className="text-xs text-taupe">Add {formatMoney(cart.freeShippingRemainingCents, cart.currency)} for free standard delivery.</p> : null}
+        <p className="text-xs text-taupe">Each designer delivers separately — choose your county at checkout to see delivery options and times.</p>
         <Button asChild size="lg" className="w-full" aria-disabled={cart.issues.length > 0}>
           <Link href={cart.issues.length ? "#" : "/checkout"}>Checkout</Link>
         </Button>

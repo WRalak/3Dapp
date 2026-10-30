@@ -59,6 +59,18 @@ export async function createSeller(opts: { status?: "PENDING" | "APPROVED" | "RE
       approvedAt: (opts.status ?? "APPROVED") === "APPROVED" ? new Date() : null,
       profile: { create: { contactName: "Owner", email: owner.email, phone: "+254712345678", description: "A Nairobi studio" } },
       wallet: { create: {} },
+      zones: {
+        create: {
+          name: "Nairobi",
+          counties: { create: { countyId: county.id } },
+          methods: {
+            create: [
+              { type: "STANDARD", name: "Standard delivery", priceCents: 35_000, minDays: 1, maxDays: 3 },
+              { type: "PICKUP", name: "Studio pickup", priceCents: 0, minDays: 0, maxDays: 1, pickupAddress: "Studio, Kilimani" },
+            ],
+          },
+        },
+      },
     },
   });
   return { seller, owner, county };
@@ -88,4 +100,26 @@ export async function createProduct(opts: { stock?: number; priceCents?: number;
   const variant = await testDb.productVariant.create({ data: { productId: product.id, sku: `SKU-${slug}`.toUpperCase(), size: "M", color: "Ink", colorHex: "#111111" } });
   await testDb.inventory.create({ data: { variantId: variant.id, quantity: opts.stock ?? 5, lowStockThreshold: 1 } });
   return { product, variant, brand, category };
+}
+
+/**
+ * A valid Kenyan checkout for whatever is in the current browser's cart, choosing each seller's
+ * delivery method of `type` (default STANDARD).
+ */
+export async function checkoutInput(over: Record<string, unknown> = {}, type: "STANDARD" | "PICKUP" = "STANDARD") {
+  const { getCart } = await import("@/server/services/cart.service");
+  const { checkoutSchema } = await import("@/lib/validation/checkout");
+  const county = await ensureCounty();
+  const cart = await getCart({ countyId: county.id, town: "Nairobi" });
+  const delivery = Object.fromEntries(cart.groups.map((g) => [g.sellerId, (g.deliveryOptions.find((o) => o.type === type) ?? g.deliveryOptions[0])?.methodId ?? "none"]));
+  return checkoutSchema.parse({
+    email: "buyer@example.com",
+    customerName: "Buyer",
+    phone: "+254700000001",
+    paymentMethod: "SANDBOX",
+    idempotencyKey: crypto.randomUUID(),
+    address: { fullName: "Buyer", phone: "0712345678", countyId: county.id, town: "Nairobi", estate: "Kilimani", building: "Riverside Apts", line1: "", directions: "" },
+    delivery,
+    ...over,
+  });
 }

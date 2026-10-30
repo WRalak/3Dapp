@@ -5,13 +5,14 @@ import { env } from "@/config/env";
 import { AppError, badRequest, notFound } from "@/lib/errors";
 import { randomToken, sha256 } from "@/lib/security/crypto";
 import { getCurrentUser } from "@/lib/auth/guards";
-import { computeTotals, unitPrice } from "@/features/orders/pricing";
+import { computeMarketplaceTotals, unitPrice } from "@/features/orders/pricing";
+import { applyPromotions } from "@/features/orders/promotions";
+import { deliveryOptionsFor } from "@/features/delivery/availability";
 import { garmentArtwork } from "@/lib/media";
-import type { ShippingMethodId } from "@/config/site";
-import type { CartLine, CartView } from "@/types/cart";
+import type { CartLine, CartSellerGroup, CartView } from "@/types/cart";
 import type { GarmentKindName } from "@/types/catalog";
 
-export const CART_COOKIE = "atelier_cart";
+export const CART_COOKIE = "mtindo_cart";
 const MAX_QTY = 20;
 
 const cartInclude = {
@@ -22,7 +23,11 @@ const cartInclude = {
         include: {
           inventory: true,
           product: {
-            include: { brand: { select: { name: true } }, images: { orderBy: { sortOrder: "asc" as const }, take: 1 } },
+            include: {
+              brand: { select: { name: true } },
+              images: { orderBy: { sortOrder: "asc" as const }, take: 1 },
+              seller: { select: { id: true, slug: true, businessName: true, town: true, status: true, deletedAt: true, county: { select: { name: true } } } },
+            },
           },
         },
       },
@@ -63,64 +68,136 @@ async function findOrCreateCart() {
 
 type CartWithItems = NonNullable<Awaited<ReturnType<typeof findCart>>>;
 
-export async function buildCartView(cart: CartWithItems | null, shippingMethod: ShippingMethodId = "standard"): Promise<CartView> {
+/** Where the bag is going and which method the customer picked per seller. */
+export interface DeliveryContext {
+  countyId?: string | null;
+  town?: string | null;
+  /** sellerId → shippingMethodId */
+  selections?: Record<string, string>;
+}
+
+/** Storefront visibility rule shared by cart, catalogue and checkout. */
+export function isPurchasable(p: { status: string; deletedAt: Date | null; approvalStatus: string; seller: { status: string; deletedAt: Date | null } }) {
+  return p.status === "PUBLISHED" && !p.deletedAt && p.approvalStatus === "APPROVED" && p.seller.status === "APPROVED" && !p.seller.deletedAt;
+}
+
+export async function activePromotions(now = new Date()) {
+  return db.promotion.findMany({ where: { isActive: true, OR: [{ endsAt: null }, { endsAt: { gt: now } }], AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }] } });
+}
+
+export async function buildCartView(cart: CartWithItems | null, delivery: DeliveryContext = {}): Promise<CartView> {
   const e = env();
   const issues: string[] = [];
-  const lines: CartLine[] = (cart?.items ?? [])
-    .filter((i) => !i.variant.deletedAt && i.variant.isActive && i.variant.product.status === "PUBLISHED" && !i.variant.product.deletedAt)
-    .map((i) => {
-      const v = i.variant;
-      const p = v.product;
-      const price = unitPrice(p, v);
-      const available = Math.max(0, (v.inventory?.quantity ?? 0) - (v.inventory?.reserved ?? 0));
-      if (available < i.quantity) issues.push(available === 0 ? `${p.name} (${v.size}) is sold out` : `Only ${available} left of ${p.name} (${v.size})`);
-      return {
-        id: i.id,
-        variantId: v.id,
-        productId: p.id,
-        slug: p.slug,
-        name: p.name,
-        brand: p.brand.name,
-        size: v.size,
-        color: v.color,
-        colorHex: v.colorHex,
-        sku: v.sku,
-        image: p.images[0]?.url ?? garmentArtwork(p.garmentKind as GarmentKindName, v.colorHex),
-        unitPriceCents: price.priceCents,
-        compareAtCents: price.compareAtCents,
-        quantity: i.quantity,
-        available,
-        lineTotalCents: price.priceCents * i.quantity,
-      };
-    });
+  const now = new Date();
+  const items = (cart?.items ?? []).filter((i) => !i.variant.deletedAt && i.variant.isActive && isPurchasable(i.variant.product));
+  const promotions = items.length ? await activePromotions(now) : [];
+  const discounts = applyPromotions(
+    items.map((i) => ({ unitPriceCents: unitPrice(i.variant.product, i.variant, now).priceCents, quantity: i.quantity, sellerId: i.variant.product.sellerId, categoryId: i.variant.product.categoryId })),
+    promotions,
+    now,
+  );
+  const lines: CartLine[] = items.map((i, idx) => {
+    const v = i.variant;
+    const p = v.product;
+    const price = unitPrice(p, v, now);
+    const available = Math.max(0, (v.inventory?.quantity ?? 0) - (v.inventory?.reserved ?? 0));
+    if (available < i.quantity) issues.push(available === 0 ? `${p.name} (${v.size}) is sold out` : `Only ${available} left of ${p.name} (${v.size})`);
+    const d = discounts[idx]!;
+    return {
+      id: i.id,
+      variantId: v.id,
+      productId: p.id,
+      slug: p.slug,
+      name: p.name,
+      brand: p.brand.name,
+      sellerId: p.sellerId,
+      categoryId: p.categoryId,
+      size: v.size,
+      color: v.color,
+      colorHex: v.colorHex,
+      sku: v.sku,
+      image: p.images[0]?.url ?? garmentArtwork(p.garmentKind as GarmentKindName, v.colorHex),
+      unitPriceCents: price.priceCents,
+      compareAtCents: price.compareAtCents,
+      quantity: i.quantity,
+      available,
+      lineTotalCents: price.priceCents * i.quantity,
+      promotionDiscountCents: d.discountCents,
+      promotionName: d.promotionName,
+      promotionId: d.promotionId,
+      sellerFunded: d.sellerFunded,
+    };
+  });
+
+  // Group by seller and work out each seller's delivery options for the destination.
+  const sellerIds = [...new Set(lines.map((l) => l.sellerId))];
+  const zones = sellerIds.length
+    ? await db.deliveryZone.findMany({ where: { sellerId: { in: sellerIds }, isActive: true }, include: { counties: { select: { countyId: true } }, methods: { where: { isActive: true } } } })
+    : [];
+  const sellerById = new Map(items.map((i) => [i.variant.product.sellerId, i.variant.product.seller]));
+  const groups: CartSellerGroup[] = sellerIds.map((sellerId) => {
+    const sellerLines = lines.filter((l) => l.sellerId === sellerId);
+    const seller = sellerById.get(sellerId)!;
+    const merchandiseCents = sellerLines.reduce((s, l) => s + l.lineTotalCents, 0);
+    const promotionDiscountCents = sellerLines.reduce((s, l) => s + l.promotionDiscountCents, 0);
+    const sellerFundedDiscountCents = sellerLines.reduce((s, l) => s + (l.sellerFunded ? l.promotionDiscountCents : 0), 0);
+    const options = deliveryOptionsFor(
+      zones.filter((z) => z.sellerId === sellerId).map((z) => ({ id: z.id, isActive: z.isActive, towns: z.towns, countyIds: z.counties.map((c) => c.countyId), methods: z.methods })),
+      delivery.countyId ?? null,
+      delivery.town ?? null,
+      merchandiseCents - promotionDiscountCents,
+      now,
+    );
+    const chosen = delivery.selections?.[sellerId];
+    return {
+      sellerId,
+      sellerName: seller.businessName,
+      sellerSlug: seller.slug,
+      sellerTown: seller.town,
+      sellerCounty: seller.county?.name ?? null,
+      lines: sellerLines,
+      merchandiseCents,
+      promotionDiscountCents,
+      sellerFundedDiscountCents,
+      deliveryOptions: options,
+      selected: options.find((o) => o.methodId === chosen) ?? null,
+    };
+  });
+
   const coupon = cart?.couponCode ? await db.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
-  const totals = computeTotals({
+  const totals = computeMarketplaceTotals({
     lines: lines.map((l) => ({ unitPriceCents: l.unitPriceCents, quantity: l.quantity })),
-    shippingMethod,
+    promotionDiscountCents: lines.reduce((s, l) => s + l.promotionDiscountCents, 0),
     coupon,
+    shippingCents: groups.reduce((s, g) => s + (g.selected?.priceCents ?? 0), 0),
     taxRateBps: e.TAX_RATE_BPS,
     taxInclusive: e.TAX_INCLUSIVE,
+    now,
   });
   return {
     id: cart?.id ?? null,
     lines,
+    groups,
     itemCount: lines.reduce((s, l) => s + l.quantity, 0),
     currency: e.STORE_CURRENCY,
     couponCode: cart?.couponCode ?? null,
     couponError: cart?.couponCode && !coupon ? "This code is not valid" : totals.couponError,
     subtotalCents: totals.subtotalCents,
+    promotionDiscountCents: totals.promotionDiscountCents,
+    couponDiscountCents: totals.couponDiscountCents,
     discountCents: totals.discountCents,
     shippingCents: totals.shippingCents,
+    deliveryComplete: groups.length > 0 && groups.every((g) => g.selected),
+    freeShipping: totals.freeShipping,
     taxCents: totals.taxCents,
     taxInclusive: e.TAX_INCLUSIVE,
     totalCents: totals.totalCents,
-    freeShippingRemainingCents: totals.freeShippingRemainingCents,
     issues,
   };
 }
 
-export async function getCart(shippingMethod?: ShippingMethodId) {
-  return buildCartView(await findCart(), shippingMethod);
+export async function getCart(delivery?: DeliveryContext) {
+  return buildCartView(await findCart(), delivery);
 }
 
 export async function getRawCart() {
@@ -128,8 +205,8 @@ export async function getRawCart() {
 }
 
 async function availableFor(variantId: string, client: Tx | typeof db = db) {
-  const v = await client.productVariant.findUnique({ where: { id: variantId }, include: { inventory: true, product: true } });
-  if (!v || v.deletedAt || !v.isActive || v.product.status !== "PUBLISHED" || v.product.deletedAt) throw notFound("Product");
+  const v = await client.productVariant.findUnique({ where: { id: variantId }, include: { inventory: true, product: { include: { seller: { select: { status: true, deletedAt: true } } } } } });
+  if (!v || v.deletedAt || !v.isActive || !isPurchasable(v.product)) throw notFound("Product");
   return Math.max(0, (v.inventory?.quantity ?? 0) - (v.inventory?.reserved ?? 0));
 }
 

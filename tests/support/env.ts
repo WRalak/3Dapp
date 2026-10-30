@@ -9,7 +9,7 @@ Object.assign(process.env, {
   ADMIN_MFA_REQUIRED: "true",
   PAYMENT_SANDBOX_ENABLED: "true",
   SANDBOX_WEBHOOK_SECRET: "sandbox-webhook-secret-for-tests-0123456789",
-  STORE_CURRENCY: "USD",
+  STORE_CURRENCY: "KES",
   TAX_RATE_BPS: "1600",
   STORAGE_DRIVER: "local",
   STORAGE_LOCAL_DIR: "./storage-test",

@@ -18,6 +18,8 @@ export const productFilterSchema = z.object({
   category: z.string().trim().max(80).optional().catch(undefined),
   collection: z.string().trim().max(80).optional().catch(undefined),
   brand: csv,
+  seller: z.string().trim().max(80).optional().catch(undefined),
+  county: z.string().trim().max(80).optional().catch(undefined),
   size: csv,
   color: csv,
   minPrice: z.coerce.number().int().min(0).optional().catch(undefined),

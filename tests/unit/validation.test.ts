@@ -10,31 +10,30 @@ const checkout = {
   email: "a@b.co",
   customerName: "Ada",
   phone: "+254700000000",
-  shippingMethod: "standard",
+  delivery: { seller1: "method1" },
   paymentMethod: "CARD",
   idempotencyKey: "0123456789abcdef0123",
-  address: { fullName: "Ada", phone: "+254700000000", line1: "1 Road", city: "Nairobi", country: "ke" },
+  address: { fullName: "Ada", phone: "0712 345 678", countyId: "c1", town: "Nairobi", estate: "Kilimani", building: "", line1: "", directions: "" },
 } as const;
 
 describe("checkout validation", () => {
-  it("accepts a complete checkout and normalises the country", () => {
+  it("accepts a complete Kenyan checkout and normalises the phone", () => {
     const r = checkoutSchema.safeParse(checkout);
     expect(r.success).toBe(true);
-    expect(r.data?.address?.country).toBe("KE");
+    expect(r.data?.address?.phone).toBe("+254712345678");
+    expect(r.data?.delivery).toEqual({ seller1: "method1" });
   });
-  it("requires an address unless collecting in store", () => {
+  it("requires an address unless a saved one is used", () => {
     expect(checkoutSchema.safeParse({ ...checkout, address: undefined }).success).toBe(false);
-    expect(checkoutSchema.safeParse({ ...checkout, address: undefined, shippingMethod: "pickup" }).success).toBe(true);
+    const saved = checkoutSchema.safeParse({ ...checkout, address: { fullName: "", town: "" }, savedAddressId: "a1" });
+    expect(saved.success).toBe(true);
+    expect(saved.data?.address).toBeUndefined();
   });
-  it("ignores half-filled hidden address fields for studio pickup (regression)", () => {
-    const r = checkoutSchema.safeParse({ ...checkout, shippingMethod: "pickup", address: { fullName: "Ada", phone: "", line1: "", city: "", country: "KE" } });
-    expect(r.success).toBe(true);
-    expect(r.data?.address).toBeUndefined();
-  });
-  it("reports nested address errors when delivery needs one", () => {
-    const r = checkoutSchema.safeParse({ ...checkout, address: { ...checkout.address, line1: "" } });
+  it("reports nested address errors (county, estate, phone)", () => {
+    const r = checkoutSchema.safeParse({ ...checkout, address: { ...checkout.address, countyId: "", estate: "", phone: "12" } });
     expect(r.success).toBe(false);
-    expect(r.error?.issues.some((i) => i.path.join(".") === "address.line1")).toBe(true);
+    const paths = r.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths).toEqual(expect.arrayContaining(["address.countyId", "address.estate", "address.phone"]));
   });
   it("requires a Safaricom number for M-Pesa", () => {
     expect(checkoutSchema.safeParse({ ...checkout, paymentMethod: "MPESA" }).success).toBe(false);

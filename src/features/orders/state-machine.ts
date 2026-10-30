@@ -27,3 +27,20 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
 };
+
+const RANK: Partial<Record<OrderStatus, number>> = { PAID: 1, PROCESSING: 2, SHIPPED: 3, DELIVERED: 4 };
+
+/**
+ * A marketplace order's overall status follows its seller sub-orders: it is only "Delivered"
+ * once every (non-cancelled) seller has delivered, "Shipped" once all have shipped, etc.
+ */
+export function parentStatusFrom(subStatuses: OrderStatus[]): OrderStatus | null {
+  const active = subStatuses.filter((s) => s !== "CANCELLED" && s !== "REFUNDED");
+  if (active.length === 0) return subStatuses.every((s) => s === "REFUNDED") && subStatuses.length ? "REFUNDED" : null;
+  if (active.some((s) => s === "PENDING_PAYMENT")) return null;
+  const min = Math.min(...active.map((s) => RANK[s] ?? 1));
+  const max = Math.max(...active.map((s) => RANK[s] ?? 1));
+  if (min === 4) return "DELIVERED";
+  if (min === 3) return "SHIPPED";
+  return max >= 2 ? "PROCESSING" : "PAID";
+}

@@ -23,7 +23,7 @@ import {
 import { resendVerificationAction } from "@/features/auth/actions";
 import type { ActionResult } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Field, FormError, Input } from "@/components/ui/form-controls";
+import { Checkbox, Field, FormError, Input, NativeSelect, Textarea } from "@/components/ui/form-controls";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 function useAction() {
@@ -128,13 +128,13 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
 
 type AddressValues = z.input<typeof addressSchema> & { id?: string };
 
-export function AddressDialog({ address, trigger }: { address?: AddressValues; trigger: React.ReactNode }) {
+export function AddressDialog({ address, trigger, counties }: { address?: AddressValues; trigger: React.ReactNode; counties: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const form = useForm<AddressValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: address ?? { label: "", fullName: "", phone: "", line1: "", line2: "", city: "", region: "", postalCode: "", country: "KE", isDefault: false },
+    defaultValues: address ?? { label: "", fullName: "", phone: "", countyId: "", town: "", estate: "", building: "", line1: "", directions: "", isDefault: false },
   });
   const e = form.formState.errors;
   const onSubmit = form.handleSubmit(async (v) => {
@@ -159,23 +159,30 @@ export function AddressDialog({ address, trigger }: { address?: AddressValues; t
           <Field label="Phone" error={e.phone?.message}>
             <Input type="tel" {...form.register("phone")} />
           </Field>
-          <Field label="Street address" error={e.line1?.message} className="sm:col-span-2">
+          <Field label="County" error={e.countyId?.message}>
+            <NativeSelect {...form.register("countyId")}>
+              <option value="">Choose county</option>
+              {counties.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Town / area" error={e.town?.message}>
+            <Input {...form.register("town")} />
+          </Field>
+          <Field label="Estate / neighbourhood" error={e.estate?.message}>
+            <Input {...form.register("estate")} />
+          </Field>
+          <Field label="Building, floor, house no." error={e.building?.message}>
+            <Input {...form.register("building")} />
+          </Field>
+          <Field label="Street / road (optional)" error={e.line1?.message} className="sm:col-span-2">
             <Input {...form.register("line1")} />
           </Field>
-          <Field label="Apartment, suite" error={e.line2?.message} className="sm:col-span-2">
-            <Input {...form.register("line2")} />
-          </Field>
-          <Field label="City" error={e.city?.message}>
-            <Input {...form.register("city")} />
-          </Field>
-          <Field label="Region" error={e.region?.message}>
-            <Input {...form.register("region")} />
-          </Field>
-          <Field label="Postal code" error={e.postalCode?.message}>
-            <Input {...form.register("postalCode")} />
-          </Field>
-          <Field label="Country code" error={e.country?.message}>
-            <Input maxLength={2} {...form.register("country")} />
+          <Field label="Directions for the rider (optional)" error={e.directions?.message} className="sm:col-span-2">
+            <Textarea rows={2} {...form.register("directions")} />
           </Field>
           <Checkbox label="Set as default delivery address" className="sm:col-span-2" {...form.register("isDefault")} />
           <div className="sm:col-span-2">

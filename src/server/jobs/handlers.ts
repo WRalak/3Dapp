@@ -7,6 +7,8 @@ import { notify } from "@/server/services/notification.service";
 import { expireStaleOrders } from "@/server/services/order.service";
 import { reconcilePayment } from "@/server/services/payment.service";
 import { processModelAsset } from "@/server/services/asset.service";
+import { releaseDueEarnings } from "@/server/services/finance.service";
+import { sendSms } from "@/features/sms/provider";
 import type { JobPayloads, JobType } from "./queue";
 
 type Handlers = { [K in JobType]: (payload: JobPayloads[K]) => Promise<void> };
@@ -87,10 +89,11 @@ export const handlers: Handlers = {
   },
 
   async "notify.lowStock"({ variantId }) {
-    const v = await db.productVariant.findUnique({ where: { id: variantId }, include: { product: true, inventory: true } });
+    const v = await db.productVariant.findUnique({ where: { id: variantId }, include: { product: { include: { seller: { select: { ownerId: true } } } }, inventory: true } });
     if (!v?.inventory) return;
     const available = v.inventory.quantity - v.inventory.reserved;
     if (available > v.inventory.lowStockThreshold) return;
+    await notify(v.product.seller.ownerId, "SELLER", "Low stock", `${v.product.name} (${v.size}, ${v.color}) has ${available} left.`, `/seller/inventory?q=${encodeURIComponent(v.sku)}`);
     const staff = await db.user.findMany({
       where: { isStaff: true, status: "ACTIVE", roles: { some: { role: { permissions: { some: { permission: { key: "inventory.adjust" } } } } } } },
       select: { id: true },
@@ -120,6 +123,14 @@ export const handlers: Handlers = {
 
   async "assets.process"({ assetId }) {
     await processModelAsset(assetId);
+  },
+
+  async "sms.send"({ to, message }) {
+    await sendSms(to, message);
+  },
+
+  async "finance.releaseEarnings"() {
+    await releaseDueEarnings();
   },
 };
 

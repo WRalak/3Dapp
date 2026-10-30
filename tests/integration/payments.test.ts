@@ -1,12 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { resetBrowser } from "../support/request-mock";
-import { createProduct, createUser, ensureRoles, testDb } from "../support/factories";
+import { checkoutInput, createProduct, createUser, ensureRoles, testDb } from "../support/factories";
 import { addToCart } from "@/server/services/cart.service";
 import { placeOrder } from "@/server/services/order.service";
 import { processWebhook, refundOrder, startPayment } from "@/server/services/payment.service";
 import { signTimestampedPayload } from "@/features/payments/signatures";
-import { checkoutSchema } from "@/lib/validation/checkout";
 import { createSession } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/guards";
 
@@ -19,14 +18,7 @@ async function pendingOrder(stock = 5, qty = 1) {
   const { variant, product } = await createProduct({ stock, priceCents: 10000 });
   await addToCart(variant.id, qty);
   const order = await placeOrder(
-    checkoutSchema.parse({
-      email: "pay@example.com",
-      customerName: "Payer",
-      phone: "+254700000002",
-      shippingMethod: "pickup",
-      paymentMethod: "SANDBOX",
-      idempotencyKey: randomUUID(),
-    }),
+    await checkoutInput({ email: "pay@example.com", customerName: "Payer", phone: "+254700000002" }, "PICKUP"),
     null,
     { ip: "198.18.0.1", userAgent: "vitest" },
   );

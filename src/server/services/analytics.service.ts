@@ -182,3 +182,72 @@ export function toCsv(rows: Record<string, string | number | null>[]) {
   };
   return [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h] ?? null)).join(","))].join("\n");
 }
+
+// ─── Marketplace analytics ───────────────────────────────────────────────────
+
+/** Paid GMV and orders by delivery county. */
+export async function salesByCounty(range: DateRange) {
+  return db.$queryRaw<{ county: string; orders: number; revenueCents: number }[]>`
+    SELECT COALESCE(c.name, 'Unknown') AS county, count(*)::int AS orders, COALESCE(sum(o."totalCents"), 0)::int AS "revenueCents"
+    FROM "Order" o LEFT JOIN "County" c ON c.id = o."countyId"
+    WHERE o."paymentStatus" IN ('PAID','PARTIALLY_REFUNDED') AND o."placedAt" >= ${range.from} AND o."placedAt" < ${range.to}
+    GROUP BY 1 ORDER BY 3 DESC LIMIT 47`;
+}
+
+/** Seller leaderboard: GMV, commission and net earnings for paid seller orders. */
+export async function salesBySeller(range: DateRange, take = 20) {
+  return db.$queryRaw<{ sellerId: string; seller: string; orders: number; gmvCents: number; commissionCents: number; netCents: number }[]>`
+    SELECT s.id AS "sellerId", s."businessName" AS seller, count(*)::int AS orders,
+           COALESCE(sum(so."totalCents"), 0)::int AS "gmvCents",
+           COALESCE(sum(so."commissionCents"), 0)::int AS "commissionCents",
+           COALESCE(sum(so."sellerNetCents"), 0)::int AS "netCents"
+    FROM "SellerOrder" so JOIN "Seller" s ON s.id = so."sellerId" JOIN "Order" o ON o.id = so."orderId"
+    WHERE o."paymentStatus" IN ('PAID','PARTIALLY_REFUNDED') AND o."placedAt" >= ${range.from} AND o."placedAt" < ${range.to}
+    GROUP BY 1, 2 ORDER BY 4 DESC LIMIT ${take}`;
+}
+
+/** Payment success by method — failed/abandoned M-Pesa prompts are a key Kenyan funnel metric. */
+export async function paymentsByMethod(range: DateRange) {
+  return db.$queryRaw<{ provider: string; succeeded: number; failed: number; amountCents: number }[]>`
+    SELECT provider::text AS provider,
+           count(*) FILTER (WHERE status IN ('SUCCEEDED','PARTIALLY_REFUNDED','REFUNDED'))::int AS succeeded,
+           count(*) FILTER (WHERE status IN ('FAILED','CANCELLED'))::int AS failed,
+           COALESCE(sum("amountCents") FILTER (WHERE status IN ('SUCCEEDED','PARTIALLY_REFUNDED','REFUNDED')), 0)::int AS "amountCents"
+    FROM "Payment" WHERE "createdAt" >= ${range.from} AND "createdAt" < ${range.to}
+    GROUP BY 1 ORDER BY 4 DESC`;
+}
+
+/** Counters for the admin overview. */
+export async function marketplaceCounters() {
+  const since = new Date(Date.now() - 7 * 86_400_000);
+  const [activeSellers, pendingApplications, pendingProducts, openReports, failedPayments, pendingPayouts, unmatchedC2b] = await Promise.all([
+    db.seller.count({ where: { status: "APPROVED", deletedAt: null } }),
+    db.seller.count({ where: { status: "PENDING", deletedAt: null } }),
+    db.product.count({ where: { approvalStatus: "PENDING_REVIEW", deletedAt: null } }),
+    db.productReport.count({ where: { status: "OPEN" } }),
+    db.payment.count({ where: { status: "FAILED", createdAt: { gte: since } } }),
+    db.sellerPayout.aggregate({ where: { status: { in: ["REQUESTED", "PROCESSING"] } }, _count: true, _sum: { amountCents: true } }),
+    db.paymentTransaction.count({ where: { type: "C2B_CONFIRMATION", status: "UNMATCHED" } }),
+  ]);
+  return { activeSellers, pendingApplications, pendingProducts, openReports, failedPayments, pendingPayouts: { count: pendingPayouts._count, amountCents: pendingPayouts._sum.amountCents ?? 0 }, unmatchedC2b };
+}
+
+/** A seller's own dashboard numbers (always scoped by sellerId). */
+export async function sellerDashboard(sellerId: string, range: DateRange) {
+  const [orders, toFulfil, products, lowStock, views] = await Promise.all([
+    db.sellerOrder.aggregate({ where: { sellerId, status: { notIn: ["PENDING_PAYMENT", "CANCELLED"] }, createdAt: { gte: range.from, lt: range.to } }, _count: true, _sum: { totalCents: true, sellerNetCents: true } }),
+    db.sellerOrder.count({ where: { sellerId, status: { in: ["PAID", "PROCESSING"] } } }),
+    db.product.groupBy({ by: ["approvalStatus"], where: { sellerId, deletedAt: null }, _count: true }),
+    db.inventory.count({ where: { variant: { deletedAt: null, product: { sellerId, deletedAt: null } }, quantity: { lte: db.inventory.fields.lowStockThreshold } } }),
+    db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "AnalyticsEvent" e JOIN "Product" p ON p.id = e."productId" WHERE e.type = 'PRODUCT_VIEW' AND p."sellerId" = ${sellerId} AND e."createdAt" >= ${range.from} AND e."createdAt" < ${range.to}`,
+  ]);
+  return {
+    orders: orders._count,
+    salesCents: orders._sum.totalCents ?? 0,
+    netCents: orders._sum.sellerNetCents ?? 0,
+    toFulfil,
+    products: Object.fromEntries(products.map((p) => [p.approvalStatus, p._count])) as Record<string, number>,
+    lowStock,
+    views: views[0]?.n ?? 0,
+  };
+}

@@ -11,11 +11,11 @@ import { ProviderError, WebhookVerificationError, type PaymentAdapter, type Stor
  *  3. Success is confirmed with a server-to-server STK Push Query before fulfilment,
  *     and the paid amount must match the order total.
  */
-const base = () => (env().MPESA_ENV === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke");
+export const base = () => (env().MPESA_ENV === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke");
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
 
-async function accessToken() {
+export async function accessToken() {
   if (tokenCache && tokenCache.expiresAt > Date.now() + 30_000) return tokenCache.token;
   const e = env();
   const basic = Buffer.from(`${e.MPESA_CONSUMER_KEY}:${e.MPESA_CONSUMER_SECRET}`).toString("base64");
@@ -26,7 +26,7 @@ async function accessToken() {
   return json.access_token;
 }
 
-function timestamp(d = new Date()) {
+export function timestamp(d = new Date()) {
   // Daraja expects YYYYMMDDHHmmss in East Africa Time (UTC+3).
   const eat = new Date(d.getTime() + 3 * 3600_000);
   return eat.toISOString().replace(/[-:T]/g, "").slice(0, 14);
@@ -134,6 +134,8 @@ export const mpesaAdapter: PaymentAdapter = {
       paymentId: claims.pid,
       providerReference: cb.CheckoutRequestID,
       failureReason,
+      // The paid amount is checked against the stored payment before fulfilment.
+      amountCents: outcome === "succeeded" && typeof items.Amount === "number" && env().STORE_CURRENCY === "KES" ? Math.round(items.Amount * 100) : undefined,
       metadata: { receipt: items.MpesaReceiptNumber, amountKes: items.Amount, phone: items.PhoneNumber },
     };
   },

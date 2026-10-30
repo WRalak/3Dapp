@@ -1,3 +1,4 @@
+import { formatAddress } from "@/features/delivery/address";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminPage, hasPermissions } from "@/lib/auth/guards";
@@ -233,7 +234,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
         <aside className="space-y-8">
           <section className="border bg-surface p-5 text-sm">
             <h2 className="eyebrow mb-3">Shipping</h2>
-            <p className="leading-relaxed">{addr.pickup ? "Studio pickup" : [addr.fullName, addr.line1, addr.line2, addr.city, addr.region, addr.postalCode, addr.country, addr.phone].filter(Boolean).join(", ")}</p>
+            <p className="leading-relaxed">{addr.pickup ? "Pickup" : [addr.fullName, formatAddress(addr), addr.phone].filter(Boolean).join(", ")}{addr.directions && <span className="block text-taupe">Directions: {addr.directions}</span>}</p>
             {order.shipments.map((s) => (
               <p key={s.id} className="mt-3 text-xs text-taupe">
                 {s.carrier} {s.trackingNumber} · {s.status.toLowerCase().replace("_", " ")}

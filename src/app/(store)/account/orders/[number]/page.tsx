@@ -1,3 +1,4 @@
+import { formatAddress } from "@/features/delivery/address";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download } from "lucide-react";
@@ -121,7 +122,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ nu
         <div>
           <h3 className="eyebrow mb-4">Delivery address</h3>
           <p className="text-sm leading-relaxed text-graphite">
-            {addr.pickup ? "Collect from the Atelier studio" : [addr.fullName, addr.line1, addr.line2, addr.city, addr.region, addr.postalCode, addr.country].filter(Boolean).join(", ")}
+            {addr.pickup ? "Pickup" : [addr.fullName, formatAddress(addr)].filter(Boolean).join(", ")}
           </p>
           {order.refunds.length > 0 && (
             <>

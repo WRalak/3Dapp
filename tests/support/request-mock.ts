@@ -19,7 +19,7 @@ vi.mock("next/headers", () => ({
   headers: async () => requestHeaders,
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: () => undefined, revalidateTag: () => undefined }));
+vi.mock("next/cache", () => ({ revalidatePath: () => undefined, revalidateTag: () => undefined, unstable_cache: <T,>(fn: T) => fn }));
 
 export function resetBrowser(ip = "203.0.113.10") {
   jar.clear();

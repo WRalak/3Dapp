@@ -28,4 +28,6 @@ export async function processBatch(limit = 10) {
 export async function scheduleMaintenance() {
   const pending = await db.job.count({ where: { type: "orders.expireReservations", status: "PENDING" } });
   if (pending === 0) await enqueue("orders.expireReservations", {}, { runAt: new Date(Date.now() + 5 * 60_000) });
+  const release = await db.job.count({ where: { type: "finance.releaseEarnings", status: "PENDING" } });
+  if (release === 0) await enqueue("finance.releaseEarnings", {}, { runAt: new Date(Date.now() + 60 * 60_000) });
 }

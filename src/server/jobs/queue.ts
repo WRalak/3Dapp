@@ -19,6 +19,8 @@ export type JobPayloads = {
   "orders.expireReservations": Record<string, never>;
   "payments.reconcile": { paymentId: string };
   "assets.process": { assetId: string };
+  "sms.send": { to: string; message: string };
+  "finance.releaseEarnings": Record<string, never>;
 };
 export type JobType = keyof JobPayloads;
 

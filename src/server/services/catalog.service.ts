@@ -9,6 +9,7 @@ import type { ProductFilter } from "@/lib/validation/catalog";
 import type {
   Facets,
   GarmentKindName,
+  Model3DData,
   Paginated,
   ProductCardData,
   ProductDetail,
@@ -66,7 +67,14 @@ export function toCard(p: CardRow, now = new Date()): ProductCardData {
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,
     garmentKind: kind,
+    seller: { id: p.seller.id, slug: p.seller.slug, name: p.seller.businessName, town: p.seller.town, county: p.seller.county?.name ?? null },
   };
+}
+
+type ModelRow = { url: string; hasDraco: boolean; hasKtx2: boolean; hasMeshopt: boolean; fileSize: number; representation: "ACCURATE" | "ILLUSTRATIVE"; status: string; deletedAt: Date | null };
+function toModel(m: ModelRow | null | undefined): Model3DData | null {
+  if (!m || m.status !== "READY" || m.deletedAt) return null;
+  return { url: m.url, hasDraco: m.hasDraco, hasKtx2: m.hasKtx2, hasMeshopt: m.hasMeshopt, fileSize: m.fileSize, representation: m.representation };
 }
 
 function filterHash(f: ProductFilter) {
@@ -151,11 +159,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     const images = p.images.length
       ? p.images.map((i) => ({ id: i.id, url: i.url, alt: i.alt, kind: i.kind, color: i.color }))
       : [
-          { id: "ph-front", url: garmentArtwork(kind, primaryHex, "front"), alt: `${p.name} — front`, kind: "FRONT" as const, color: null },
-          { id: "ph-back", url: garmentArtwork(kind, primaryHex, "back"), alt: `${p.name} — back`, kind: "BACK" as const, color: null },
-          { id: "ph-detail", url: garmentArtwork(kind, primaryHex, "detail"), alt: `${p.name} — fabric detail`, kind: "FABRIC_DETAIL" as const, color: null },
+          // Generated silhouettes only — never a fake "fabric detail" shot (we can't show fabric we haven't photographed).
+          { id: "ph-front", url: garmentArtwork(kind, primaryHex, "front"), alt: `${p.name} — illustration (front)`, kind: "FRONT" as const, color: null },
+          { id: "ph-back", url: garmentArtwork(kind, primaryHex, "back"), alt: `${p.name} — illustration (back)`, kind: "BACK" as const, color: null },
         ];
-    const model = p.model3D && p.model3D.status === "READY" && !p.model3D.deletedAt ? p.model3D : null;
     return {
       ...card,
       description: p.description,
@@ -170,8 +177,9 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       images,
       variants,
       sizes: sortSizes(variants.map((v) => v.size)),
-      model: model ? { url: model.url, hasDraco: model.hasDraco, hasKtx2: model.hasKtx2, hasMeshopt: model.hasMeshopt, fileSize: model.fileSize } : null,
+      model: toModel(p.model3D),
       totalStock: variants.reduce((s, v) => s + v.available, 0),
+      imagesAreIllustrative: p.images.length === 0,
       seoTitle: p.seoTitle,
       seoDescription: p.seoDescription,
     };
@@ -286,7 +294,6 @@ export async function getShowroomItems(opts: { category?: string; collection?: s
     });
     return rows.map((p) => {
       const card = toCard(p as unknown as CardRow);
-      const model = p.model3D && p.model3D.status === "READY" && !p.model3D.deletedAt ? p.model3D : null;
       return {
         id: p.id,
         slug: p.slug,
@@ -297,7 +304,9 @@ export async function getShowroomItems(opts: { category?: string; collection?: s
         garmentKind: card.garmentKind,
         primaryColor: card.colors[0]?.hex ?? "#2b2a28",
         image: card.image,
-        model: model ? { url: model.url, hasDraco: model.hasDraco, hasKtx2: model.hasKtx2, hasMeshopt: model.hasMeshopt, fileSize: model.fileSize } : null,
+        model: toModel(p.model3D),
+        seller: card.seller,
+        inStock: card.inStock,
       };
     });
   });

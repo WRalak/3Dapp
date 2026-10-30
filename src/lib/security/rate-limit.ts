@@ -67,6 +67,11 @@ export const RateLimits = {
   review: { limit: 5, window: 60 * 60 },
   upload: { limit: 30, window: 60 * 60 },
   webhook: { limit: 300, window: 60 },
+  phoneOtp: { limit: 3, window: 15 * 60 },
+  phoneOtpVerify: { limit: 8, window: 15 * 60 },
+  inquiry: { limit: 10, window: 60 * 60 },
+  report: { limit: 10, window: 60 * 60 },
+  sellerApply: { limit: 5, window: 60 * 60 },
 } as const;
 
 /**

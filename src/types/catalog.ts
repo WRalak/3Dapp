@@ -18,6 +18,14 @@ export interface ColorSwatch {
   hex: string;
 }
 
+export interface SellerSummary {
+  id: string;
+  slug: string;
+  name: string;
+  town: string | null;
+  county: string | null;
+}
+
 export interface ProductCardData {
   id: string;
   slug: string;
@@ -35,6 +43,7 @@ export interface ProductCardData {
   ratingAvg: number;
   ratingCount: number;
   garmentKind: GarmentKindName;
+  seller: SellerSummary;
 }
 
 export interface VariantData {
@@ -62,6 +71,8 @@ export interface Model3DData {
   hasKtx2: boolean;
   hasMeshopt: boolean;
   fileSize: number;
+  /** ACCURATE = built from the real garment; ILLUSTRATIVE = generic shape, colour/fabric approximate. */
+  representation: "ACCURATE" | "ILLUSTRATIVE";
 }
 
 export interface ProductDetail extends ProductCardData {
@@ -79,6 +90,8 @@ export interface ProductDetail extends ProductCardData {
   sizes: string[];
   model: Model3DData | null;
   totalStock: number;
+  /** No real photography uploaded — images are generated silhouettes, not the actual fabric. */
+  imagesAreIllustrative: boolean;
   seoTitle: string | null;
   seoDescription: string | null;
 }
@@ -94,6 +107,8 @@ export interface ShowroomItem {
   primaryColor: string;
   image: string | null;
   model: Model3DData | null;
+  seller: SellerSummary;
+  inStock: boolean;
 }
 
 export interface Facets {
