@@ -135,7 +135,8 @@ export function Showroom({ items, currency, height = "h-[calc(100dvh-16rem)] min
   const caps = useDeviceCapability(forceFallback);
   const container = useRef<HTMLDivElement>(null);
   const visible = useInView(container);
-  const [dpr, setDpr] = useState<number>(1);
+  const [dprOverride, setDpr] = useState<number | null>(null);
+  const dpr = dprOverride ?? caps?.dpr[1] ?? 1;
   const order = useShowroomStore((s) => s.order);
   const focusIndex = useShowroomStore((s) => s.focusIndex);
   const selectedId = useShowroomStore((s) => s.selectedId);
@@ -145,9 +146,6 @@ export function Showroom({ items, currency, height = "h-[calc(100dvh-16rem)] min
   useEffect(() => {
     useShowroomStore.setState({ order: items.map((i) => i.id), selectedId: null, offset: 0, offsetTarget: 0, velocity: 0, focusIndex: 0 });
   }, [items]);
-  useEffect(() => {
-    if (caps) setDpr(caps.dpr[1]);
-  }, [caps]);
 
   // Keyboard: ←/→ browse, Enter inspect, Esc return.
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -195,8 +193,8 @@ export function Showroom({ items, currency, height = "h-[calc(100dvh-16rem)] min
           >
             <PerformanceMonitor
               bounds={() => [45, 58]}
-              onDecline={() => setDpr((d) => Math.max(1, Math.round((d - 0.25) * 100) / 100))}
-              onIncline={() => setDpr((d) => Math.min(caps.dpr[1], Math.round((d + 0.25) * 100) / 100))}
+              onDecline={() => setDpr(Math.max(1, Math.round((dpr - 0.25) * 100) / 100))}
+              onIncline={() => setDpr(Math.min(caps.dpr[1], Math.round((dpr + 0.25) * 100) / 100))}
               flipflops={3}
               onFallback={() => setDpr(1)}
             />

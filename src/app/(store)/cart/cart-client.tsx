@@ -60,19 +60,30 @@ export function CouponForm({ cart }: { cart: CartView }) {
       </div>
     );
   }
+  // Not a <form>: this control is also rendered inside the checkout form, and forms can't nest.
+  const submit = () => {
+    if (code.trim()) apply.mutate(code.trim());
+  };
   return (
-    <form
-      className="flex gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (code.trim()) apply.mutate(code.trim());
-      }}
-    >
-      <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Discount code" aria-label="Discount code" className="h-10" maxLength={40} />
-      <Button type="submit" variant="outline" size="sm" className="h-10" loading={apply.isPending}>
+    <div className="flex gap-2" role="group" aria-label="Discount code">
+      <Input
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="Discount code"
+        aria-label="Discount code"
+        className="h-10"
+        maxLength={40}
+      />
+      <Button type="button" variant="outline" size="sm" className="h-10" loading={apply.isPending} onClick={submit}>
         Apply
       </Button>
-    </form>
+    </div>
   );
 }
 

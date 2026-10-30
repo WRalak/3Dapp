@@ -124,25 +124,58 @@ function LoadedModel({ model }: { model: Model3DData }) {
     });
   }, [scene]);
 
-  // Free GPU memory when the model leaves the load window.
-  useEffect(
-    () => () => {
-      gltf.scene.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.geometry?.dispose();
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const m of mats) {
-          for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose();
-          m.dispose();
-        }
-      });
-      useGLTF.clear(model.url);
-    },
-    [gltf, model.url],
-  );
+  // Reference-count the URL; GPU memory is released a while after the last user unmounts
+  // (deferred so Suspense re-renders and quick back-and-forth scrolling don't thrash).
+  useEffect(() => {
+    scenes.set(model.url, gltf.scene);
+    return retainModel(model.url);
+  }, [model.url, gltf.scene]);
 
   return <primitive object={scene} />;
+}
+
+const refs = new Map<string, number>();
+const evictTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const EVICT_AFTER_MS = 20_000;
+
+const scenes = new Map<string, THREE.Object3D>();
+
+function disposeModel(url: string) {
+  const scene = scenes.get(url);
+  scenes.delete(url);
+  try {
+    scene?.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry?.dispose();
+      for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        for (const v of Object.values(m)) if (v instanceof THREE.Texture) v.dispose();
+        m.dispose();
+      }
+    });
+  } catch {
+    /* already disposed */
+  }
+  useGLTF.clear(url);
+}
+
+function retainModel(url: string) {
+  refs.set(url, (refs.get(url) ?? 0) + 1);
+  const pending = evictTimers.get(url);
+  if (pending) clearTimeout(pending);
+  evictTimers.delete(url);
+  return () => {
+    const n = (refs.get(url) ?? 1) - 1;
+    refs.set(url, n);
+    if (n > 0) return;
+    evictTimers.set(
+      url,
+      setTimeout(() => {
+        evictTimers.delete(url);
+        if ((refs.get(url) ?? 0) === 0) disposeModel(url);
+      }, EVICT_AFTER_MS),
+    );
+  };
 }
 
 class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {

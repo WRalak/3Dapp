@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { classify, probeDevice, type Capabilities } from "@/features/showroom/capabilities";
 
-/** Returns null until probed on the client (avoids SSR/hydration mismatch). */
+/**
+ * Probes the device once. Callers are client-only (loaded with `ssr: false`), so probing in
+ * the initializer is safe; on the server it returns null.
+ */
 export function useDeviceCapability(forceFallback = false): Capabilities | null {
-  const [caps, setCaps] = useState<Capabilities | null>(null);
+  const [probed] = useState<Capabilities | null>(() => (typeof window === "undefined" ? null : classify(probeDevice())));
+  const [reducedMotion, setReducedMotion] = useState<boolean | null>(null);
   useEffect(() => {
-    const probed = classify(probeDevice());
-    setCaps(forceFallback ? { ...probed, webgl: false } : probed);
     const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const onChange = () => setCaps((c) => (c ? { ...c, reducedMotion: mq.matches } : c));
+    const onChange = () => setReducedMotion(mq.matches);
     mq?.addEventListener?.("change", onChange);
     return () => mq?.removeEventListener?.("change", onChange);
-  }, [forceFallback]);
-  return caps;
+  }, []);
+  return useMemo(
+    () => (probed ? { ...probed, webgl: forceFallback ? false : probed.webgl, reducedMotion: reducedMotion ?? probed.reducedMotion } : null),
+    [probed, forceFallback, reducedMotion],
+  );
 }
 
 /** Pauses rendering when the element is off-screen or the tab is hidden. */

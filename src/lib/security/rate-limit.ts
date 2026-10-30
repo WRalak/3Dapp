@@ -69,7 +69,16 @@ export const RateLimits = {
   webhook: { limit: 300, window: 60 },
 } as const;
 
+/**
+ * RATE_LIMIT_MULTIPLIER (default 1) scales every policy — raise it only for automated test
+ * environments where all traffic originates from one IP. Never set it in production.
+ */
+function multiplier() {
+  const m = Number(process.env.RATE_LIMIT_MULTIPLIER ?? 1);
+  return Number.isFinite(m) && m >= 1 ? m : 1;
+}
+
 export async function limitBy(policy: keyof typeof RateLimits, identifier: string) {
   const p = RateLimits[policy];
-  return rateLimit(`${policy}:${identifier}`, p.limit, p.window);
+  return rateLimit(`${policy}:${identifier}`, p.limit * multiplier(), p.window);
 }

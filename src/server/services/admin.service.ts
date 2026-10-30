@@ -76,6 +76,16 @@ export async function listStaff() {
   });
 }
 
+/** Audit-log activity per staff member over the last N days. */
+export async function staffActivity(days = 30) {
+  return db.auditLog.groupBy({
+    by: ["actorId"],
+    where: { createdAt: { gte: new Date(Date.now() - days * 86400_000) }, actor: { isStaff: true } },
+    _count: { _all: true },
+    _max: { createdAt: true },
+  });
+}
+
 export async function listRoles() {
   return db.role.findMany({ orderBy: { name: "asc" }, include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } } });
 }

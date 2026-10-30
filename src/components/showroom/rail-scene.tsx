@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, createInstances, Environment, Lightformer } from "@react-three/drei";
@@ -29,6 +29,7 @@ function CameraRig() {
     // keep rail (y≈0.8) and floor (y≈-1.03) in frame with breathing room
     const byHeight = 2.55 / (2 * halfTan);
     const distance = THREE.MathUtils.clamp(Math.max(byWidth, byHeight), 3.2, 9);
+    // eslint-disable-next-line react-hooks/immutability -- three.js cameras are mutated imperatively by design
     cam.fov = FOV;
     cam.position.set(0, 0.02, distance);
     cam.lookAt(0, -0.1, 0);
@@ -239,22 +240,24 @@ export function RailScene({ items, caps }: { items: ShowroomItem[]; caps: Capabi
   const focusIndex = useShowroomStore((s) => s.focusIndex);
   const order = useShowroomStore((s) => s.order);
   const selectedId = useShowroomStore((s) => s.selectedId);
-  const [loaded, setLoaded] = useState<Set<string>>(new Set());
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   // Load window: only garments near the focus (plus the selected one) fetch their GLB.
-  useEffect(() => {
+  const loaded = useMemo(() => {
     const window = new Set<string>();
     order.forEach((id, slot) => {
       if (Math.abs(slot - focusIndex) <= caps.loadRadius) window.add(id);
     });
     if (selectedId) window.add(selectedId);
-    setLoaded(window);
+    return window;
+  }, [order, focusIndex, selectedId, caps.loadRadius]);
+
+  useEffect(() => {
     // Warm the cache one step beyond the window in the direction of travel.
     const ahead = order[focusIndex + caps.loadRadius + 1];
     const model = ahead ? byId.get(ahead)?.model : null;
     if (model && caps.tier !== "low") preloadModel(model.url);
-  }, [focusIndex, order, selectedId, caps.loadRadius, caps.tier, byId]);
+  }, [focusIndex, order, caps.loadRadius, caps.tier, byId]);
 
   return (
     <>

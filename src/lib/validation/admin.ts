@@ -2,7 +2,11 @@ import { z } from "zod";
 import { ALL_PERMISSIONS, STAFF_ROLE_KEYS } from "@/lib/auth/permissions";
 
 const money = z.coerce.number().min(0, "Must be positive").max(1_000_000, "Too large");
-const optionalMoney = z.union([z.literal(""), z.null(), z.undefined(), money]).transform((v) => (v === "" || v == null ? null : v));
+// Optional money field: blank form inputs ("") and missing keys both mean "not set" (null).
+const optionalMoney = z
+  .union([z.literal(""), z.null(), money])
+  .optional()
+  .transform((v) => (v === "" || v == null ? null : v));
 const slug = z
   .string()
   .trim()

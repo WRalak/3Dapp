@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage, hasPermissions } from "@/lib/auth/guards";
-import { listInvitations, listStaff } from "@/server/services/admin.service";
+import { listInvitations, listStaff, staffActivity } from "@/server/services/admin.service";
 import { ALL_PERMISSIONS, STAFF_ROLE_KEYS } from "@/lib/auth/permissions";
-import { db } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/admin/shell";
 import { ActionButton, FormDialog } from "@/components/admin/admin-ui";
@@ -20,7 +19,7 @@ export default async function StaffPage() {
   const [staff, invites, activity] = await Promise.all([
     listStaff(),
     listInvitations(),
-    db.auditLog.groupBy({ by: ["actorId"], where: { createdAt: { gte: new Date(Date.now() - 30 * 86400_000) }, actor: { isStaff: true } }, _count: { _all: true }, _max: { createdAt: true } }),
+    staffActivity(30),
   ]);
   const activityBy = new Map(activity.map((a) => [a.actorId, a]));
   const roleOptions = STAFF_ROLE_KEYS.filter((r) => isSuper || r !== "SUPER_ADMIN").map((r) => ({ value: r, label: r.replace(/_/g, " ").toLowerCase() }));
