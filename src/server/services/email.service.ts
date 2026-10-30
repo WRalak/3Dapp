@@ -43,7 +43,12 @@ export async function sendEmail(msg: EmailMessage) {
   const { html, text } = renderEmail(msg);
   const t = getTransport();
   if (!t) {
-    // Development: no SMTP configured. Log the message (links included) instead of sending.
+    if (env().NODE_ENV === "production") {
+      // Never write message bodies (they contain one-time tokens) to production logs.
+      logger.error({ subject: msg.subject }, "email not sent — SMTP_URL is not configured");
+      throw new Error("SMTP_URL is not configured");
+    }
+    // Development: log the message (links included) instead of sending.
     logger.info({ to: msg.to, subject: msg.subject, text }, "email (not sent — SMTP_URL unset)");
     return;
   }

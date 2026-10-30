@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIES = ["__Host-atelier_session", "atelier_session"];
 
 function assetOrigins() {
-  return [process.env.CDN_URL, process.env.S3_PUBLIC_URL]
+  return [process.env.CDN_URL, process.env.S3_PUBLIC_URL, process.env.NEXT_PUBLIC_SENTRY_DSN]
     .filter((v): v is string => !!v)
     .map((u) => {
       try {

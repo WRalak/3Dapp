@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+  DATABASE_URL: postgresql://atelier:atelier@localhost:5432/atelier?schema=public
+  TEST_DATABASE_URL: postgresql://atelier:atelier@localhost:5432/atelier_test?schema=public
+  REDIS_URL: redis://localhost:6379
+  AUTH_SECRET: ci-auth-secret-ci-auth-secret-ci-auth-secret-0123
+  ENCRYPTION_KEY: ci-encryption-key-ci-encryption-key-ci-0123456
+  APP_URL: http://localhost:3000
+
+jobs:
+  quality:
+    name: Lint & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  test:
+    name: Unit & integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: atelier, POSTGRES_PASSWORD: atelier, POSTGRES_DB: atelier_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U atelier" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - run: npm test -- --coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: coverage, path: coverage, retention-days: 7 }
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    needs: [test]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: atelier, POSTGRES_PASSWORD: atelier, POSTGRES_DB: atelier }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U atelier" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      ADMIN_MFA_REQUIRED: "false"
+      PAYMENT_SANDBOX_ENABLED: "true"
+      SANDBOX_WEBHOOK_SECRET: ci-sandbox-secret-ci-sandbox-secret-0123
+      RATE_LIMIT_MULTIPLIER: "50"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: playwright-report, retention-days: 7 }
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: [quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with: { context: ., target: web, push: false, tags: "atelier:ci", cache-from: type=gha, cache-to: "type=gha,mode=max" }

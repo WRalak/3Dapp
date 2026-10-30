@@ -13,3 +13,4 @@ storage/
 playwright-report
 test-results
 .DS_Store
+storage-test/
