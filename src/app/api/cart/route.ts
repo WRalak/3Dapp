@@ -8,7 +8,11 @@ import { requestContextFrom } from "@/lib/security/request";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route(async () => NextResponse.json(await getCart(), { headers: { "cache-control": "private, no-store" } }));
+export const GET = route(async (req) => {
+  const shipping = new URL(req.url).searchParams.get("shipping");
+  const method = shipping === "express" || shipping === "pickup" ? shipping : "standard";
+  return NextResponse.json(await getCart(method), { headers: { "cache-control": "private, no-store" } });
+});
 
 export const POST = route(async (req) => {
   const rl = await limitBy("api", requestContextFrom(req).ip);

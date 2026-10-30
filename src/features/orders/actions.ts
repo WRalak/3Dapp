@@ -11,6 +11,7 @@ import { placeOrder } from "@/server/services/order.service";
 import { startPayment } from "@/server/services/payment.service";
 import { trackEvent } from "@/server/services/analytics.service";
 import { cookies } from "next/headers";
+import { readGuestOrders, rememberGuestOrder } from "./guest-orders";
 
 /**
  * Checkout: creates the order (idempotent), then starts payment with the chosen provider.
@@ -20,6 +21,7 @@ export const checkoutAction = action(checkoutSchema, async (input) => {
   const user = await getCurrentUser();
   const ctx = await requestContext();
   const order = await placeOrder(input, user, ctx);
+  if (!user) await rememberGuestOrder(order.number);
   const vid = (await cookies()).get("atelier_vid")?.value;
   if (vid) await trackEvent("ORDER_PLACED", vid, { userId: user?.id });
 
@@ -44,7 +46,8 @@ export const retryPaymentAction = action(
   async ({ orderNumber, paymentMethod, mpesaPhone }) => {
     const user = await getCurrentUser();
     const order = await db.order.findUnique({ where: { number: orderNumber } });
-    if (!order || (order.userId && order.userId !== user?.id)) throw notFound("Order");
+    const guestOk = !order?.userId && order && (await readGuestOrders()).includes(order.number);
+    if (!order || (order.userId ? order.userId !== user?.id : !guestOk)) throw notFound("Order");
     if (order.status !== "PENDING_PAYMENT") throw badRequest("This order no longer needs payment");
     const next = await startPayment(order.id, paymentMethod, { phone: mpesaPhone || order.phone });
     return { redirectTo: next.redirectUrl ?? `/orders/${order.number}/confirmation?payment=${next.paymentId}`, instructions: next.instructions };

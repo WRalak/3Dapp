@@ -1,35 +1,10 @@
 import { Document, NodeIO } from "@gltf-transform/core";
+import { GARMENT_DEPTH, GARMENT_PROFILES as PROFILES, GARMENT_Y_OFFSET } from "../src/features/showroom/garment-profiles";
 
 /**
  * Procedurally builds a lathe-style garment silhouette (dress / coat / top) as a real GLB,
  * so development data exercises the same GLTF loading path as production assets.
  */
-type Profile = [radius: number, y: number][];
-
-export const PROFILES: Record<string, Profile> = {
-  DRESS: [
-    [0.02, 1.5], [0.12, 1.49], [0.16, 1.44], [0.17, 1.36], [0.15, 1.24], [0.13, 1.1], [0.16, 1.0], [0.22, 0.8], [0.3, 0.55], [0.38, 0.3], [0.42, 0.18],
-  ],
-  COAT: [
-    [0.03, 1.52], [0.14, 1.5], [0.22, 1.44], [0.23, 1.3], [0.21, 1.1], [0.2, 0.95], [0.22, 0.7], [0.25, 0.45], [0.27, 0.3],
-  ],
-  JACKET: [
-    [0.03, 1.5], [0.14, 1.49], [0.22, 1.43], [0.22, 1.28], [0.2, 1.1], [0.19, 0.95], [0.2, 0.85],
-  ],
-  TOP: [
-    [0.03, 1.5], [0.12, 1.49], [0.19, 1.44], [0.19, 1.3], [0.17, 1.15], [0.18, 1.0], [0.19, 0.92],
-  ],
-  KNIT: [
-    [0.04, 1.5], [0.13, 1.49], [0.21, 1.42], [0.22, 1.28], [0.21, 1.1], [0.2, 0.98], [0.18, 0.9],
-  ],
-  SKIRT: [
-    [0.13, 1.05], [0.15, 1.0], [0.2, 0.8], [0.27, 0.6], [0.32, 0.45],
-  ],
-  TROUSERS: [
-    [0.15, 1.05], [0.17, 0.95], [0.16, 0.75], [0.14, 0.5], [0.12, 0.25], [0.11, 0.1],
-  ],
-};
-
 export function buildGarmentGlb(kind: string, hex: string, segments = 48): Promise<Uint8Array> {
   const profile = PROFILES[kind] ?? PROFILES.TOP!;
   const rows = profile.length;
@@ -43,10 +18,10 @@ export function buildGarmentGlb(kind: string, hex: string, segments = 48): Promi
     for (let s = 0; s <= segments; s++) {
       const a = (s / segments) * Math.PI * 2;
       const x = Math.cos(a) * radius;
-      const z = Math.sin(a) * radius * 0.62;
-      positions.push(x, y - 0.9, z);
-      const len = Math.hypot(Math.cos(a), Math.sin(a) / 0.62) || 1;
-      normals.push(Math.cos(a) / len, 0, Math.sin(a) / 0.62 / len);
+      const z = Math.sin(a) * radius * GARMENT_DEPTH;
+      positions.push(x, y + GARMENT_Y_OFFSET, z);
+      const len = Math.hypot(Math.cos(a), Math.sin(a) / GARMENT_DEPTH) || 1;
+      normals.push(Math.cos(a) / len, 0, Math.sin(a) / GARMENT_DEPTH / len);
     }
   }
   for (let r = 0; r < rows - 1; r++) {

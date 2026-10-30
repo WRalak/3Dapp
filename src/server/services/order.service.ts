@@ -277,7 +277,7 @@ export { returnStock, releaseOrderReservations };
 
 // ── Queries ───────────────────────────────────────────────────
 
-export async function getOrderForViewer(number: string, viewer: AuthUser | null, guestEmail?: string) {
+export async function getOrderForViewer(number: string, viewer: AuthUser | null, guestOrderNumbers: string[] = []) {
   const order = await db.order.findUnique({
     where: { number },
     include: {
@@ -291,7 +291,8 @@ export async function getOrderForViewer(number: string, viewer: AuthUser | null,
   if (!order) return null;
   const isOwner = viewer && order.userId === viewer.id;
   const isStaff = viewer?.isStaff && viewer.permissions.includes("orders.view");
-  const isGuestMatch = !order.userId && guestEmail && guestEmail.toLowerCase() === order.email;
+  // Guest orders are viewable from the browser that placed them (signed cookie).
+  const isGuestMatch = !order.userId && guestOrderNumbers.includes(order.number);
   if (!isOwner && !isStaff && !isGuestMatch) return null;
   return order;
 }
