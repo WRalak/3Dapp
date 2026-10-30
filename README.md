@@ -12,17 +12,27 @@ Mtindo is a multi-vendor fashion marketplace for Kenya. Independent designers, t
 
 ## Quick start
 
-Prerequisites: Node 22+, PostgreSQL 14+ and, optionally, Redis.
+Prerequisites: Node 22+ and PostgreSQL 14+ (Redis optional). The commands work in PowerShell, macOS and Linux.
+
+No local PostgreSQL? Start one (plus Redis) with Docker Desktop:
 
 ```bash
-cp .env.example .env
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-At minimum set `DATABASE_URL`, `AUTH_SECRET` and `ENCRYPTION_KEY`. For local development also set `ADMIN_MFA_REQUIRED=false`, `PAYMENT_SANDBOX_ENABLED=true` and `SANDBOX_WEBHOOK_SECRET`.
+Install dependencies (this also generates the Prisma client):
 
 ```bash
 npm install
 ```
+
+Create a development `.env` with random secrets, sandbox payments and optional staff MFA. It never overwrites an existing `.env`:
+
+```bash
+npm run setup
+```
+
+If your PostgreSQL isn't the Docker one, edit `DATABASE_URL` in `.env`. Then create the tables and demo data:
 
 ```bash
 npx prisma migrate deploy
@@ -36,7 +46,7 @@ npm run db:seed
 npm run dev
 ```
 
-In a second terminal, run the background worker (emails, SMS, reservation expiry, payment reconciliation, earnings release):
+Optionally, in a second terminal, run the background worker (emails, SMS, reservation expiry, payment reconciliation, earnings release):
 
 ```bash
 npm run worker

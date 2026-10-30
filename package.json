@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup": "node scripts/create-env.mjs",
     "predev": "prisma generate",
     "dev": "next dev",
     "build": "prisma generate && next build",

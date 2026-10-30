@@ -1,0 +1,21 @@
+# Local development databases only (the app runs on your machine with `npm run dev`):
+#   docker compose -f docker-compose.dev.yml up -d
+# Matches the default DATABASE_URL / REDIS_URL in .env.example.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: atelier
+      POSTGRES_PASSWORD: atelier
+      POSTGRES_DB: mtindo
+    ports: ["5432:5432"]
+    volumes: [devpgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atelier"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+volumes:
+  devpgdata:
