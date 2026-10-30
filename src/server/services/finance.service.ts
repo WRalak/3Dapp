@@ -196,6 +196,11 @@ export async function processPayout(payoutId: string, input: { action: "paid" | 
   const p = await db.sellerPayout.findUnique({ where: { id: payoutId }, include: { seller: { include: { profile: true } } } });
   if (!p) throw notFound("Payout");
   if (!["REQUESTED", "PROCESSING"].includes(p.status)) throw conflict(`This payout is already ${p.status.toLowerCase()}`);
+  // KYC: no money leaves the platform until the seller's national ID has been verified.
+  if (input.action !== "failed") {
+    const kyc = await db.sellerDocument.count({ where: { sellerId: p.sellerId, type: "NATIONAL_ID", status: "ACCEPTED" } });
+    if (!kyc) throw badRequest("Verify the seller's national ID before paying out");
+  }
 
   if (input.action === "initiate") {
     const provider = getPayoutProvider("mpesa-b2c");

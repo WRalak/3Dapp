@@ -19,8 +19,13 @@
 7. **Payments:** register these webhook endpoints and set the matching secrets:
    - Stripe → `https://your-domain/api/webhooks/card` (events `checkout.session.*`).
    - PayPal → `https://your-domain/api/webhooks/paypal` (events `PAYMENT.CAPTURE.*`); set `PAYPAL_WEBHOOK_ID`.
-   - M-Pesa: callback URLs are generated per payment. Set `MPESA_*`, plus `MPESA_KES_RATE` when the store currency isn't KES.
-8. **Jobs:** run at least one `worker` replica, or schedule `GET /api/cron/jobs` every minute with `Authorization: Bearer $CRON_SECRET`.
+   - M-Pesa STK Push: callback URLs are generated per payment. Set `MPESA_*` (keep `STORE_CURRENCY=KES`).
+   - M-Pesa Paybill (C2B): set `MPESA_C2B_SHORTCODE` (or reuse `MPESA_SHORTCODE`), optionally `MPESA_ALLOWED_IPS`, then press **Register M-Pesa C2B URLs** on **Admin → Finance** once per shortcode.
+   - Seller payouts: manual by default. To automate, ask Safaricom to enable B2C, then set `MPESA_B2C_INITIATOR` and `MPESA_B2C_SECURITY_CREDENTIAL`; a **Send via M-Pesa** button appears on **Admin → Finance → Payouts**.
+   - SMS (phone verification): `SMS_PROVIDER=africastalking` with `AFRICASTALKING_*`. The `console` provider refuses to run in production.
+   - Marketplace economics: `DEFAULT_COMMISSION_BPS`, `SELLER_PAYOUT_HOLD_DAYS`, `MIN_PAYOUT_CENTS`. Category and per-seller commission overrides are set in the admin.
+8. **Jobs:** run at least one `worker` replica, or schedule `GET /api/cron/jobs` every minute with `Authorization: Bearer $CRON_SECRET`. The worker also releases seller earnings hourly (`finance.releaseEarnings`).
+   - **Storage privacy:** seller verification documents live under the `private/` key prefix. On S3/R2, make sure the bucket policy does **not** expose `private/*` publicly (serve public assets from `images/` and `models/` only).
 9. **Monitoring:** set `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`. Point your load balancer at `GET /api/health`, which returns 503 when the database is down. Ship stdout JSON logs to your log platform.
 10. **Assets:** add `public/fonts/Satoshi-Variable.woff2`. Put a CDN in front of `/_next/static`, `/vendor` and the asset bucket.
 11. **First admin:** run the seed once, or create a user and grant `SUPER_ADMIN`. Then change the password and enrol MFA, and invite the other staff from **Admin → Staff**.

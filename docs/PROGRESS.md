@@ -2,7 +2,40 @@
 
 Status of each phase in the brief, with how it was verified. Everything listed as done runs against real PostgreSQL and Redis. No analytics figure or product record is hardcoded; the seed writes real rows, and every screen reads them.
 
-## Phase summary
+## Kenyan marketplace (second brief)
+
+The single-vendor store was converted into **Mtindo**, a multi-vendor marketplace for Kenya. A data-preserving migration moved existing products and orders onto a house seller. Design notes are in [MARKETPLACE.md](MARKETPLACE.md).
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1. Repository review & architecture | ✅ | Kept the layering (actions → services → Prisma); documented in MARKETPLACE.md |
+| 2. Marketplace data model | ✅ | Seller & profile/documents/verification, seller orders, commission, wallets, payouts, append-only ledger, payment transactions, counties, zones, methods, tracking, promotions, follows, inquiries, reports, phone verification; CHECK constraints and triggers |
+| 3. Kenyan localisation | ✅ | KES formatting, en-KE + Kiswahili, Africa/Nairobi, 47 counties, Kenyan address model, phone normalisation |
+| 4. Sellers | ✅ | Onboarding with private document upload, approval workflow with history, seller portal (products, photos, inventory, orders, messages, delivery, earnings, profile), strict isolation |
+| 5. Checkout & delivery | ✅ | Per-seller delivery options by county/town (same-day cut-off, free-over, pickup), split orders, promotions + coupons, VAT-inclusive totals |
+| 6. Payments | ✅ | M-Pesa STK (receipts recorded), M-Pesa Paybill C2B with validation/confirmation/idempotency/unmatched queue, card/PayPal unchanged, payout providers (manual, M-Pesa B2C) |
+| 7. Finance | ✅ | Commission resolution, ledger postings at payment/release/refund/payout, hold period, payouts with reservation, reconciliation, finance dashboard |
+| 8. Storefront | ✅ | Designers directory & stores, follow, ask-the-designer, report listing, sold-by + delivery check, campaigns, translated navigation, Lite mode |
+| 9. 3D | ✅ | Seller/location and delivery check in the inspect panel; ILLUSTRATIVE vs ACCURATE models with honest notices; 3D disabled in Lite/data-saver; purchase never requires 3D |
+| 10. Admin | ✅ | Sellers & documents, listing approvals, reports, finance & payouts, campaigns, county coverage, marketplace KPIs, analytics by county/seller/payment method, per-seller refunds |
+| 11. Tests, seed, docs | ✅ | See below |
+
+### Verification (marketplace)
+
+- **Unit (97):** settlement and commission resolution, refund splits, proportional allocation, promotions (scope, windows, caps, no stacking), marketplace totals (coupon after promotions, free delivery, inclusive VAT), delivery availability (coverage, towns, EAT cut-off, free-over, pickup), split-order status, KES/date/phone formatting, locale negotiation, Kiswahili dictionary completeness.
+- **Integration (60, real Postgres):** multi-seller checkout with per-seller commission; a balanced ledger on payment; idempotent settlement; platform-funded coupons absorbed by the platform; checkout refused for uncovered counties (pickup still offered); seller isolation (foreign product edit and fulfilment → 404; pending sellers blocked); visibility of unapproved listings and suspended sellers; earnings release after the hold; payout reservation, overdraw rejection, KYC (accepted national ID) and a reference required before paying, wallets reconciling to the ledger; refunds reversing commission; C2B validation (account, amount), receipt idempotency, unmatched payments parked; permissions for finance, content, support and seller roles.
+- **Seed:** run against a fresh database. It produced 47 counties, 7 sellers and 27 products, plus 81 multi-seller orders settled through `settlePaidOrder`. All 8 wallets reconciled to the ledger, which balanced. A re-run is idempotent.
+- **E2E:** see the run recorded below.
+
+### Defects found and fixed (marketplace round)
+
+1. **3D rail offset (pre-existing):** GLB models were measured with `Box3.setFromObject` *after* R3F attached them to their rail slot, so the "centering" included the slot's world position and shifted every off-centre model sideways (one slot rendered empty, the next held two garments). Caught by the mobile-touch e2e plus screenshots. Models are now normalised on the detached clone, and keep true real-world proportions (a jacket no longer stretches to gown length).
+2. **Short garments were hard to tap:** each rail slot now has a full-height invisible hit area.
+3. **A fresh database could not be seeded:** the migration only creates the house store when legacy products exist; the seed now upserts it.
+4. **Hidden main navigation on phones** made the Kiswahili e2e assertion flaky; the test now checks the footer.
+5. **E2E login race:** helpers now wait for the post-login redirect before navigating.
+
+## Phase summary (first brief)
 
 | Phase | Status | Notes |
 |---|---|---|
@@ -52,6 +85,17 @@ Status of each phase in the brief, with how it was verified. Everything listed a
 8. A streaming `loading.tsx` on product pages turned missing products into soft 404s (HTTP 200); it was removed and e2e now asserts a real 404.
 
 ## Known limitations and follow-ups
+
+**Marketplace**
+
+- **M-Pesa B2C and C2B** were implemented against Daraja's documented APIs but not called live (no credentials or network). Exercise them in the Daraja sandbox before launch. B2C also needs Safaricom approval for the shortcode; until then payouts are manual, with references recorded.
+- **Money type:** integer cents rather than `Decimal` (see MARKETPLACE.md for why). This is a deliberate deviation from the brief's wording that meets its intent (exact, never floating point).
+- **Languages via cookie, not URL prefixes:** search engines index English only. Adding `/sw` routes later is isolated to `getLocale()` and the links.
+- **Shipping providers:** only the `manual` provider exists. A courier API (e.g. a Kenyan last-mile service) plugs into `features/delivery/providers.ts` and a webhook that appends `ShipmentTracking`.
+- **Seller store images** (logo/cover) are URLs in the profile form; seller product photos upload directly. Logo/cover upload can reuse the same uploader.
+- **Infrastructure names:** Docker Compose and `db-roles.sql` still use the original `atelier_*` database role names. They are internal and safe to keep or rename together.
+
+**General**
 
 - **Satoshi font:** the font host was unreachable from the build sandbox, so the woff2 isn't committed. Drop `Satoshi-Variable.woff2` into `public/fonts/`; until then a fallback sans-serif is used.
 - **Docker:** the Dockerfile and Compose file were written and the standalone output they package was run, but no Docker daemon was available here to run `docker build`. CI includes an image build job.

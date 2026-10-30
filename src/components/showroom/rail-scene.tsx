@@ -196,6 +196,11 @@ const RailItem = memo(function RailItem({ item, caps, loadModel }: ItemProps) {
           document.body.style.cursor = "";
         }}
       >
+        {/* Invisible full-height hit area: short pieces (tops, jackets) are as easy to tap as gowns. */}
+        <mesh position={[0, -0.12, 0.05]}>
+          <planeGeometry args={[RAIL_SPACING * 0.8, 1.45]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        </mesh>
         {/* pivot at the hanger hook so the garment swings and rotates naturally */}
         <group position={[0, RAIL_Y, 0]}>
           <group ref={pivot}>

@@ -166,6 +166,8 @@ describe("earnings, payouts and refunds", () => {
     expect([Number(wallet.availableCents), Number(wallet.reservedCents)]).toEqual([99_000, 200_000]);
 
     const finance = await signInAs(await createUser({ role: "FINANCE_MANAGER" }));
+    await expect(processPayout(payout.id, { action: "paid", reference: "QK12ABC345" }, finance)).rejects.toMatchObject({ code: "BAD_REQUEST" }); // KYC first
+    await testDb.sellerDocument.create({ data: { sellerId: a.seller.id, type: "NATIONAL_ID", fileKey: `private/documents/${uid("id")}.pdf`, fileName: "id.pdf", contentType: "application/pdf", size: 10, status: "ACCEPTED" } });
     await expect(processPayout(payout.id, { action: "paid" }, finance)).rejects.toMatchObject({ code: "VALIDATION" }); // reference required
     await processPayout(payout.id, { action: "paid", reference: "QK12ABC345" }, finance);
     wallet = await testDb.sellerWallet.findUniqueOrThrow({ where: { sellerId: a.seller.id } });

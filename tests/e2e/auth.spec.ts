@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ADMIN, login } from "./helpers";
+import { ADMIN, CUSTOMER, login } from "./helpers";
 
 test("customers can register, see their dashboard and sign out", async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`;
@@ -26,7 +26,7 @@ test("weak passwords are rejected", async ({ page }) => {
 });
 
 test("customers cannot reach the admin dashboard or admin APIs", async ({ page }) => {
-  await login(page, "customer@atelier.local", "Customer-Demo-2026");
+  await login(page, CUSTOMER.email, CUSTOMER.password);
   await expect(page).toHaveURL(/\/account/);
   await page.goto("/admin");
   await expect(page).not.toHaveURL(/\/admin/);

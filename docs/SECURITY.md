@@ -20,6 +20,12 @@
 | Headers | HSTS (preload), `nosniff`, `X-Frame-Options: DENY`, strict Referrer-Policy, Permissions-Policy, COOP | `next.config.ts` |
 | Secrets | Validated env (`config/env.ts`), server-only imports (`server-only`), nothing secret under `NEXT_PUBLIC_*`. The sandbox payment provider refuses to start in production. Production never logs email bodies (they contain tokens) | `.env.example` |
 | Database | Least-privilege app role without DDL (`scripts/db-roles.sql`) | `docs/DEPLOYMENT.md` |
+| Seller isolation | The seller is resolved from the session, never from input. Every seller query is scoped by `sellerId`; foreign ids return 404. Sellers have no staff permissions and cannot reach `/admin` | `lib/auth/seller-guard.ts`, `tests/integration/marketplace.test.ts` |
+| Seller documents | Uploaded to a `private/` prefix via signed URL, magic-byte checked, never served by `/media`; staff access through an authorised, audited, no-store route | `seller.service.ts`, `api/admin/seller-documents` |
+| Financial actions | Commission changes, payout requests/decisions, payout-detail changes, refunds, listing and seller decisions are all audited. Ledger and verification history are append-only (triggers). Wallet debits use conditional updates; reconciliation detects drift. Bank account numbers are AES-GCM encrypted | `finance.service.ts`, `prisma/migrations/*_marketplace` |
+| M-Pesa C2B / B2C | C2B URLs carry an HMAC path secret plus an optional IP allow-list; receipts are unique; amounts must match an open order or are parked as unmatched. B2C results use signed per-payout URLs and must match the ConversationID | `features/payments/providers/mpesa-c2b.ts`, `api/payouts/mpesa` |
+| Phone verification | 6-digit SMS code hashed with the user id, 10-minute expiry, 5 attempts, per-user send/verify rate limits, uniqueness of verified numbers | `community.service.ts` |
+| Customer ↔ seller messages | Only the thread's customer and the seller's owner can read or reply; rate-limited; a warning not to pay off-platform | `community.service.ts` |
 
 ## Reporting
 

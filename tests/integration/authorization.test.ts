@@ -97,3 +97,34 @@ describe("server-side RBAC", () => {
     await expect(requireUser()).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
   });
 });
+
+describe("marketplace permissions", () => {
+  it("finance can pay sellers but not moderate them", async () => {
+    await signIn("FINANCE_MANAGER");
+    await expect(requirePermission("finance.payouts")).resolves.toBeTruthy();
+    await expect(requirePermission("sellers.commission")).resolves.toBeTruthy();
+    await expect(requirePermission("sellers.manage")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(requirePermission("products.approve")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("content managers moderate listings and reports, not money", async () => {
+    await signIn("CONTENT_MANAGER");
+    await expect(requirePermission("products.approve")).resolves.toBeTruthy();
+    await expect(requirePermission("reports.manage")).resolves.toBeTruthy();
+    await expect(requirePermission("finance.view")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("support can look up sellers read-only", async () => {
+    await signIn("CUSTOMER_SUPPORT");
+    await expect(requirePermission("sellers.view")).resolves.toBeTruthy();
+    await expect(requirePermission("sellers.manage")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(requirePermission("finance.payouts")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("sellers get no staff permissions at all", async () => {
+    const u = await createUser({ role: "SELLER", staff: false });
+    await createSession(u, { mfaVerified: true });
+    await expect(requirePermission("dashboard.view")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(requirePermission("orders.view")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});

@@ -5,8 +5,9 @@
 ```
 src/
 ├── app/
-│   ├── (store)/          customer storefront: home, shop, products, collections, showroom,
-│   │                     wishlist, cart, checkout, order confirmation, account dashboard
+│   ├── (store)/          customer storefront: home, shop, products, designers, collections,
+│   │                     showroom, wishlist, cart, checkout, /sell onboarding, account
+│   ├── seller/           seller portal (own layout; seller resolved from the session)
 │   ├── (auth)/           login, register, reset, verify email, MFA, staff invitations
 │   ├── admin/            administration dashboard (own layout, permission-filtered)
 │   ├── api/              Route Handlers: cart, wishlist, products, uploads, webhooks,
@@ -14,11 +15,15 @@ src/
 │   └── media/[...key]    local storage driver file serving
 ├── components/           ui/ (design system), store/, products/, showroom/, admin/
 ├── features/             domain logic + Server Actions: auth, users, orders (pricing,
-│                         state machine, invoices), payments (providers), showroom
-│                         (capabilities, glTF inspector, garment profiles), uploads, admin
+│                         promotions, state machine, invoices), payments (providers incl.
+│                         M-Pesa C2B), payouts (manual, M-Pesa B2C), finance (settlement),
+│                         delivery (counties, availability, address, shipping providers),
+│                         marketplace actions, preferences, sms, showroom, uploads, admin
+├── i18n/                 en-KE and Kiswahili dictionaries, locale + Lite-mode resolution
 ├── server/
 │   ├── services/         use cases (auth, catalogue, cart, orders, payments, inventory,
-│   │                     assets, analytics, admin, audit, notifications, email)
+│   │                     assets, analytics, admin, audit, notifications, email,
+│   │                     seller, delivery, fulfilment, finance, community)
 │   ├── repositories/     query builders shared by services
 │   └── jobs/             Postgres job queue, handlers, worker, cron runner
 ├── lib/                  auth (sessions, guards, RBAC, OAuth), db, cache, security,
@@ -32,6 +37,9 @@ tests/                    unit/, integration/ (real Postgres), e2e/ (Playwright)
 
 ## Data model highlights
 
+- **Marketplace:** `Seller` (+ `SellerProfile`, `SellerDocument`, append-only `SellerVerification`), `SellerOrder` per seller per order, `Commission`, `SellerWallet`, `SellerPayout`, append-only `PlatformTransaction` ledger, `PaymentTransaction` (every provider interaction, unique M-Pesa receipts), `County`, `DeliveryZone`, `ShippingMethod`, `ShipmentTracking`, `Promotion`, `SellerFollow`, `SellerInquiry`, `ProductReport`, `PhoneVerification`. See [MARKETPLACE.md](MARKETPLACE.md).
+- Migration `20261030120000_marketplace` backfilled existing products and orders to a house seller before making `Product.sellerId` required, so it upgrades a live single-vendor database without data loss.
+
 - All money is stored as **integer minor units**. Prices, discounts, shipping and tax are always recomputed on the server from the database.
 - **Inventory** keeps `quantity` (on hand) and `reserved` (held by unpaid orders). A `CHECK (reserved <= quantity AND quantity >= 0)` constraint makes overselling impossible at the database level. Every change writes an `InventoryMovement`.
 - `OrderStatusHistory` and `AuditLog` are **append-only**: database triggers reject `UPDATE` and `DELETE`.
@@ -39,6 +47,8 @@ tests/                    unit/, integration/ (real Postgres), e2e/ (Playwright)
 - A GIN full-text index uses an immutable `product_search_document()` function for weighted product search.
 
 ## Orders and payments
+
+Orders are split into seller orders and settled through the ledger; see [MARKETPLACE.md](MARKETPLACE.md) for the multi-seller flow, commission, payouts and M-Pesa C2B. The pipeline below applies to the customer payment.
 
 1. **Checkout** (`placeOrder`) runs in one transaction. It recomputes totals, validates the coupon (atomic redemption cap), creates the order and items, **reserves stock** with conditional `UPDATE … WHERE quantity - reserved >= n`, writes status history and clears the cart. An idempotency key makes double-submits return the same order. Stock is held for 30 minutes.
 2. **Payment start** creates a `Payment` row (with its own idempotency key), then calls the provider adapter. Adapters implement `initiate`, `verifyWebhook`, `fetchStatus` and `refund` (`src/features/payments`), so checkout never knows provider details.

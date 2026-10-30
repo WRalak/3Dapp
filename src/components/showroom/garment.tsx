@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, Suspense, useEffect, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
@@ -107,22 +107,28 @@ function useLoaderExtension() {
 function LoadedModel({ model }: { model: Model3DData }) {
   const extend = useLoaderExtension();
   const gltf = useGLTF(model.url, DRACO_PATH, true, extend);
-  const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
-
-  useLayoutEffect(() => {
-    const box = new THREE.Box3().setFromObject(scene);
+  // Normalise on the detached clone: measuring after R3F attaches it would include the rail
+  // slot's world transform and shift every off-centre garment sideways.
+  const scene = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+    clone.position.set(0, 0, 0);
+    clone.scale.setScalar(1);
+    clone.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
-    const scale = size.y > 0 ? TARGET_HEIGHT / size.y : 1;
-    scene.scale.setScalar(scale);
+    // glTF is in metres: keep true proportions for plausibly-sized garments (a jacket stays
+    // shorter than a gown) and only normalise models authored in other units.
+    const plausible = size.y >= 0.15 && size.y <= 2.2;
+    const scale = plausible ? 1 : size.y > 0 ? TARGET_HEIGHT / size.y : 1;
     const center = box.getCenter(new THREE.Vector3());
+    clone.scale.setScalar(scale);
     // Hang from the top: top of the model sits at the hanger's shoulder line.
-    scene.position.set(-center.x * scale, -box.max.y * scale + 0.6, -center.z * scale);
-    scene.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) {
-        o.castShadow = true;
-      }
+    clone.position.set(-center.x * scale, -box.max.y * scale + 0.6, -center.z * scale);
+    clone.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.castShadow = true;
     });
-  }, [scene]);
+    return clone;
+  }, [gltf.scene]);
 
   // Reference-count the URL; GPU memory is released a while after the last user unmounts
   // (deferred so Suspense re-renders and quick back-and-forth scrolling don't thrash).
