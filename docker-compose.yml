@@ -1,0 +1,60 @@
+# Local/full-stack deployment: web + worker + PostgreSQL + Redis.
+#   cp .env.example .env   # fill in secrets
+#   docker compose up -d db redis
+#   docker compose run --rm migrate
+#   docker compose up -d web worker
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: atelier
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atelier}
+      POSTGRES_DB: atelier
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atelier"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes: [redisdata:/data]
+
+  migrate:
+    build: { context: ., target: tools }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://atelier:${POSTGRES_PASSWORD:-atelier}@db:5432/atelier?schema=public
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on: { db: { condition: service_healthy } }
+    profiles: [tools]
+
+  web:
+    build: { context: ., target: web }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://atelier:${POSTGRES_PASSWORD:-atelier}@db:5432/atelier?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_LOCAL_DIR: /app/storage
+    ports: ["3000:3000"]
+    volumes: [uploads:/app/storage]
+    depends_on: { db: { condition: service_healthy }, redis: { condition: service_started } }
+    restart: unless-stopped
+
+  worker:
+    build: { context: ., target: tools }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://atelier:${POSTGRES_PASSWORD:-atelier}@db:5432/atelier?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_LOCAL_DIR: /app/storage
+    command: ["npm", "run", "worker"]
+    volumes: [uploads:/app/storage]
+    depends_on: { db: { condition: service_healthy } }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:

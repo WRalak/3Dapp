@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/*
+ * Satoshi (Indian Type Foundry, ITF Free Font License) is self-hosted.
+ * Place Satoshi-Variable.woff2 / Satoshi-VariableItalic.woff2 in /public/fonts.
+ * When absent, the fallback stack below keeps the layout stable.
+ */
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Palette — warm neutrals with an ink accent */
+  --color-ivory: #f7f5f1;
+  --color-bone: #efebe4;
+  --color-sand: #e2dcd2;
+  --color-stone: #b9b1a5;
+  --color-taupe: #8a8277;
+  --color-graphite: #4a4640;
+  --color-ink: #161513;
+  --color-clay: #9c5b3e;
+  --color-moss: #4f5b48;
+  --color-danger: #9f2d20;
+  --color-success: #3f6b47;
+  --color-warning: #a8741a;
+
+  --color-background: var(--color-ivory);
+  --color-foreground: var(--color-ink);
+  --color-muted: var(--color-bone);
+  --color-muted-foreground: var(--color-taupe);
+  --color-border: #ddd7cd;
+  --color-ring: var(--color-ink);
+  --color-surface: #ffffff;
+
+  --font-sans: "Satoshi", "General Sans", ui-sans-serif, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-display: clamp(3rem, 8vw, 7.5rem);
+  --text-display--line-height: 0.92;
+  --text-display--letter-spacing: -0.04em;
+  --text-headline: clamp(2rem, 4vw, 3.5rem);
+  --text-headline--line-height: 1;
+  --text-headline--letter-spacing: -0.03em;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--letter-spacing: 0.18em;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  --ease-luxe: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "ss02";
+  }
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-ivory);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    font-size: var(--text-eyebrow);
+    letter-spacing: var(--text-eyebrow--letter-spacing);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .container-luxe {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 3rem);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-bone) 0%, var(--color-sand) 50%, var(--color-bone) 100%);
+    background-size: 800px 100%;
+    animation: var(--animate-shimmer);
+  }
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.4s var(--ease-luxe);
+  }
+  .link-underline:hover {
+    background-size: 100% 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
