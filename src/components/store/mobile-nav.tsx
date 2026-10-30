@@ -9,6 +9,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useT } from "@/i18n/client";
 
 const categories = [
+  { label: "Ankara & Kitenge", href: "/shop?category=ankara" },
   { label: "Women", href: "/shop?category=women" },
   { label: "Men", href: "/shop?category=men" },
   { label: "Children", href: "/shop?category=children" },
@@ -38,6 +39,9 @@ export function MobileNav({ signedIn }: { signedIn: boolean }) {
             </li>
           ))}
         </ul>
+        <Link href="/sell" className="mt-8 inline-block text-sm underline underline-offset-4">
+          {t("nav.sell")}
+        </Link>
         <p className="eyebrow mb-4 mt-12 text-taupe">Shop by category</p>
         <ul className="grid grid-cols-2 gap-3 text-sm">
           {categories.map((c) => (

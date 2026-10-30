@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage, hasPermissions } from "@/lib/auth/guards";
 import { env } from "@/config/env";
-import { bestSellers, getDashboardStats, resolveRange, revenueSeries } from "@/server/services/analytics.service";
+import { bestSellers, getDashboardStats, marketplaceCounters, resolveRange, revenueSeries } from "@/server/services/analytics.service";
 import { lowStockVariants } from "@/server/services/inventory.service";
 import { formatDate, formatMoney } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/admin/shell";
@@ -24,7 +24,7 @@ export default async function AdminOverview({ searchParams }: { searchParams: Pr
     );
   }
   const currency = env().STORE_CURRENCY;
-  const [stats, series, lowStock, sellers] = await Promise.all([getDashboardStats(), revenueSeries(resolveRange(undefined, undefined, 30)), lowStockVariants(8), bestSellers(5)]);
+  const [stats, series, lowStock, sellers, mk] = await Promise.all([getDashboardStats(), revenueSeries(resolveRange(undefined, undefined, 30)), lowStockVariants(8), bestSellers(5), marketplaceCounters()]);
   const m = (c: number) => formatMoney(c, currency);
 
   return (
@@ -40,6 +40,17 @@ export default async function AdminOverview({ searchParams }: { searchParams: Pr
         <StatCard label="Completed orders" value={stats.completed.toLocaleString()} hint="Delivered" />
         <StatCard label="Low-stock variants" value={lowStock.length.toLocaleString()} />
         <StatCard label="Avg. order (30d)" value={m(Math.round(series.reduce((s, d) => s + d.revenueCents, 0) / Math.max(1, series.reduce((s, d) => s + d.orders, 0))))} />
+      </div>
+
+      <h2 className="eyebrow mb-3 mt-8">Marketplace</h2>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Link href="/admin/sellers?status=APPROVED"><StatCard label="Active sellers" value={mk.activeSellers.toLocaleString()} /></Link>
+        <Link href="/admin/sellers?status=PENDING"><StatCard label="Seller applications" value={mk.pendingApplications.toLocaleString()} hint="Awaiting review" /></Link>
+        <Link href="/admin/approvals"><StatCard label="Listings to review" value={mk.pendingProducts.toLocaleString()} /></Link>
+        <Link href="/admin/reports"><StatCard label="Open reports" value={mk.openReports.toLocaleString()} /></Link>
+        <Link href="/admin/finance/payouts"><StatCard label="Pending payouts" value={m(mk.pendingPayouts.amountCents)} hint={`${mk.pendingPayouts.count} request(s)`} /></Link>
+        <StatCard label="Failed payments (7d)" value={mk.failedPayments.toLocaleString()} />
+        <Link href="/admin/finance"><StatCard label="Unmatched M-Pesa" value={mk.unmatchedC2b.toLocaleString()} hint="Paybill payments to reconcile" /></Link>
       </div>
 
       <section className="mt-8 border bg-surface p-6">

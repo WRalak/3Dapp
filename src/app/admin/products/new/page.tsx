@@ -28,6 +28,7 @@ export default async function NewProductPage() {
           isFeatured: false,
           status: "DRAFT",
           collectionIds: [],
+          sellerId: "house-seller",
           variants: [{ sku: "", size: "M", color: "Ink", colorHex: "#1c1b19", stock: 0, lowStockThreshold: 5, isActive: true, price: "" as unknown as number, salePrice: "" as unknown as number }],
         }}
       />

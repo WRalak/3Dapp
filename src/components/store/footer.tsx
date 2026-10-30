@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { db } from "@/lib/db/prisma";
 import { site } from "@/config/site";
+import { getT } from "@/i18n/server";
 import { NewsletterForm } from "./newsletter-form";
+import { LanguageSwitcher, LiteToggle } from "./preferences";
 
 export async function Footer() {
-  const links = await db.navigationLink.findMany({ where: { location: "FOOTER", isActive: true }, orderBy: [{ group: "asc" }, { sortOrder: "asc" }] });
+  const [links, t] = await Promise.all([db.navigationLink.findMany({ where: { location: "FOOTER", isActive: true }, orderBy: [{ group: "asc" }, { sortOrder: "asc" }] }), getT()]);
   const groups = links.reduce<Record<string, typeof links>>((acc, l) => {
     (acc[l.group ?? "More"] ??= []).push(l);
     return acc;
   }, {});
   const shop = [
+    { label: "Ankara & Kitenge", href: "/shop?category=ankara" },
     { label: "Women", href: "/shop?category=women" },
     { label: "Men", href: "/shop?category=men" },
-    { label: "Shoes & bags", href: "/shop?category=shoes" },
-    { label: "Luxury", href: "/shop?category=luxury" },
-    { label: "New arrivals", href: "/new-arrivals" },
+    { label: t("nav.designers"), href: "/designers" },
+    { label: t("nav.collections"), href: "/collections" },
+    { label: t("nav.newArrivals"), href: "/new-arrivals" },
+  ];
+  const sell = [
+    { label: t("nav.sell"), href: "/sell" },
+    { label: t("nav.sellerDashboard"), href: "/seller" },
   ];
   return (
     <footer className="mt-24 bg-ink text-ivory md:mt-40">
@@ -23,15 +30,27 @@ export async function Footer() {
           <p className="text-2xl font-medium uppercase tracking-[0.42em]">{site.name}</p>
           <p className="mt-6 max-w-sm text-sm leading-relaxed text-stone">{site.description}</p>
           <div className="mt-10 max-w-md">
-            <p className="eyebrow mb-4 text-stone">Newsletter</p>
+            <p className="eyebrow mb-4 text-stone">{t("footer.newsletter")}</p>
             <NewsletterForm />
           </div>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-10 sm:grid-cols-3 md:col-span-7">
           <div>
-            <p className="eyebrow mb-5 text-stone">Shop</p>
+            <p className="eyebrow mb-5 text-stone">{t("footer.shop")}</p>
             <ul className="space-y-3 text-sm">
               {shop.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="link-underline text-ivory/80 hover:text-ivory">
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="eyebrow mb-5 text-stone">{t("footer.sell")}</p>
+            <ul className="space-y-3 text-sm">
+              {sell.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className="link-underline text-ivory/80 hover:text-ivory">
                     {l.label}
@@ -61,7 +80,11 @@ export async function Footer() {
           <p>
             © {new Date().getFullYear()} {site.name}. All rights reserved.
           </p>
-          <p>Payments: M-Pesa · Card · PayPal</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <LanguageSwitcher />
+            <LiteToggle />
+            <p>{t("footer.payments")}</p>
+          </div>
         </div>
       </div>
     </footer>

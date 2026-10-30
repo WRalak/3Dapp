@@ -349,6 +349,10 @@ export async function getOrderForViewer(number: string, viewer: AuthUser | null,
       payments: { orderBy: { createdAt: "desc" } },
       shipments: { orderBy: { createdAt: "desc" } },
       refunds: true,
+      sellerOrders: {
+        orderBy: { createdAt: "asc" },
+        include: { seller: { select: { slug: true, businessName: true } }, shipments: { include: { tracking: { orderBy: { occurredAt: "asc" } } } } },
+      },
     },
   });
   if (!order) return null;

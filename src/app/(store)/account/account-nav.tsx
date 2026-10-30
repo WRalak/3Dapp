@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/account", label: "Overview" },
   { href: "/account/orders", label: "My orders" },
+  { href: "/account/messages", label: "Messages" },
+  { href: "/account/following", label: "Following" },
   { href: "/wishlist", label: "Wishlist" },
   { href: "/account/profile", label: "Profile" },
   { href: "/account/addresses", label: "Addresses" },
   { href: "/account/notifications", label: "Notifications" },
-  { href: "/account/security", label: "Security" },
+  { href: "/account/security", label: "Security & phone" },
 ];
 
 export function AccountNav({ unread }: { unread: number }) {

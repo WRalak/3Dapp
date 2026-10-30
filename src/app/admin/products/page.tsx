@@ -18,12 +18,12 @@ import type { GarmentKindName } from "@/types/catalog";
 
 export const metadata = { title: "Products" };
 
-export default async function AdminProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; category?: string; page?: string }> }) {
+export default async function AdminProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; approval?: string; seller?: string; category?: string; page?: string }> }) {
   const user = await requireAdminPage("products.view");
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const [{ items, total, pageCount }, categories] = await Promise.all([
-    listAdminProducts({ q: sp.q?.slice(0, 80), status: sp.status, categoryId: sp.category, page }),
+    listAdminProducts({ q: sp.q?.slice(0, 80), status: sp.status, approval: sp.approval, categoryId: sp.category, sellerId: sp.seller, page }),
     db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   const canWrite = hasPermissions(user, ["products.write"]);
@@ -92,7 +92,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                     </span>
                     <span>
                       <span className="block font-medium">{p.name}</span>
-                      <span className="text-xs text-taupe">{p.brand.name}</span>
+                      <span className="text-xs text-taupe">{p.seller.businessName} · {p.brand.name}{p.approvalStatus !== "APPROVED" && ` · ${p.approvalStatus === "REJECTED" ? "rejected" : "in review"}`}</span>
                     </span>
                     {p.isFeatured && <Badge tone="ink">Featured</Badge>}
                   </Link>

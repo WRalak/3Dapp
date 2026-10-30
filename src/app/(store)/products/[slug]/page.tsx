@@ -12,6 +12,11 @@ import { ProductFacts } from "@/components/showroom/inspect-panel";
 import { ReviewForm } from "@/components/products/review-form";
 import { Rating, SectionHeading } from "@/components/ui/misc";
 import { formatDate } from "@/lib/utils";
+import { listCounties } from "@/server/services/delivery.service";
+import { isFollowing } from "@/server/services/seller.service";
+import { RepresentationNotice, SoldBy } from "@/components/marketplace/seller-card";
+import { DeliveryCheck } from "@/components/marketplace/delivery-check";
+import { ContactSeller, FollowButton, ReportProduct } from "@/components/marketplace/seller-actions";
 
 type Params = Promise<{ slug: string }>;
 
@@ -31,7 +36,8 @@ export default async function ProductPage({ params }: { params: Params }) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
   const currency = env().STORE_CURRENCY;
-  const [reviews, recommended, related, user] = await Promise.all([getApprovedReviews(product.id), getRecommendations(product.id), getRelatedProducts(product.id, 8), getCurrentUser()]);
+  const [reviews, recommended, related, user, counties] = await Promise.all([getApprovedReviews(product.id), getRecommendations(product.id), getRelatedProducts(product.id, 8), getCurrentUser(), listCounties()]);
+  const following = await isFollowing(user?.id, product.seller.id);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -45,6 +51,7 @@ export default async function ProductPage({ params }: { params: Params }) {
       priceCurrency: currency,
       lowPrice: (product.priceCents / 100).toFixed(2),
       availability: product.totalStock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: product.seller.name },
     },
     ...(product.ratingCount ? { aggregateRating: { "@type": "AggregateRating", ratingValue: product.ratingAvg.toFixed(1), reviewCount: product.ratingCount } } : {}),
   };
@@ -79,8 +86,18 @@ export default async function ProductPage({ params }: { params: Params }) {
               <Rating value={product.ratingAvg} count={product.ratingCount} />
             </a>
           )}
-          <div className="mt-8">
+          <div className="mt-6">
+            <SoldBy seller={product.seller}>
+              <FollowButton sellerId={product.seller.id} following={following} signedIn={!!user} />
+              <ContactSeller sellerId={product.seller.id} sellerName={product.seller.name} productId={product.id} signedIn={!!user} />
+            </SoldBy>
+          </div>
+          <div className="mt-6">
             <PurchasePanel product={product} currency={currency} />
+          </div>
+          <div className="mt-6 space-y-4">
+            <DeliveryCheck sellerId={product.seller.id} counties={counties.map((c) => ({ id: c.id, name: c.name }))} amountCents={product.priceCents} currency={currency} />
+            <RepresentationNotice modelAccurate={product.model ? product.model.representation === "ACCURATE" : null} hasPhotos={!product.imagesAreIllustrative} />
           </div>
           <div className="mt-10" id="size-guide">
             <ProductFacts product={product} />
@@ -144,6 +161,9 @@ export default async function ProductPage({ params }: { params: Params }) {
           <ProductGrid products={related.slice(0, 4)} />
         </section>
       )}
+      <div className="container-luxe mt-10">
+        <ReportProduct productId={product.id} signedIn={!!user} />
+      </div>
       <RecentlyViewed excludeId={product.id} />
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLite } from "@/i18n/client";
 import Image from "next/image";
 import { Box, Heart } from "lucide-react";
 import { motion } from "framer-motion";
@@ -14,6 +15,7 @@ export function ProductCard({ product, priority, index = 0 }: { product: Product
   const { data: wishlist } = useWishlistIds();
   const toggle = useToggleWishlist();
   const saved = wishlist?.ids.includes(product.id) ?? false;
+  const lite = useLite(); // Lite mode: smaller images, no hover image download
 
   return (
     <motion.article
@@ -23,7 +25,7 @@ export function ProductCard({ product, priority, index = 0 }: { product: Product
       transition={{ duration: 0.6, delay: Math.min(index, 6) * 0.05, ease: [0.22, 1, 0.36, 1] }}
       className="group relative"
     >
-      <Link href={`/products/${product.slug}`} className="block" aria-label={`${product.name} by ${product.brand}`}>
+      <Link href={`/products/${product.slug}`} className="block" aria-label={`${product.name} by ${product.seller.name}`}>
         <div className="relative aspect-[3/4] overflow-hidden bg-bone">
           {product.image && (
             <Image
@@ -31,12 +33,13 @@ export function ProductCard({ product, priority, index = 0 }: { product: Product
               alt={product.name}
               fill
               priority={priority}
+              quality={lite ? 45 : 75}
               unoptimized={isSvgSource(product.image)}
               sizes="(min-width:1280px) 25vw, (min-width:768px) 33vw, 50vw"
               className={cn("object-cover transition-all duration-[1200ms] ease-[var(--ease-luxe)] group-hover:scale-[1.03]", product.hoverImage && "group-hover:opacity-0")}
             />
           )}
-          {product.hoverImage && (
+          {product.hoverImage && !lite && (
             <Image
               src={product.hoverImage}
               alt=""
@@ -58,8 +61,9 @@ export function ProductCard({ product, priority, index = 0 }: { product: Product
           )}
         </div>
         <div className="mt-4 space-y-1">
-          <p className="eyebrow text-taupe">{product.brand}</p>
+          <p className="eyebrow truncate text-taupe">{product.seller.name}</p>
           <h3 className="text-sm leading-snug">{product.name}</h3>
+          {product.seller.town && <p className="truncate text-[11px] text-taupe">{product.seller.town}</p>}
           <Price cents={product.priceCents} compareAt={product.compareAtCents} className="text-sm text-graphite" />
           {product.colors.length > 1 && (
             <div className="flex items-center gap-1.5 pt-1" aria-label={`${product.colors.length} colours`}>

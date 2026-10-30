@@ -1,4 +1,5 @@
 import { formatAddress } from "@/features/delivery/address";
+import { etaLabel } from "@/features/delivery/availability";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download } from "lucide-react";
@@ -74,10 +75,48 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ nu
               )}
             </p>
           ) : (
-            <p className="mt-2 text-sm text-taupe">{order.shippingMethod === "pickup" ? "Studio pickup" : "Not shipped yet"}</p>
+            <p className="mt-2 text-sm text-taupe">{order.shippingMethod === "pickup" ? "Pickup" : "Not shipped yet"}</p>
           )}
         </div>
       </div>
+
+      {order.sellerOrders.length > 0 && (
+        <section>
+          <h3 className="eyebrow mb-4">Deliveries</h3>
+          <ul className="space-y-3">
+            {order.sellerOrders.map((so) => (
+              <li key={so.id} className="border p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    <Link href={`/designers/${so.seller.slug}`} className="font-medium underline-offset-4 hover:underline">
+                      {so.seller.businessName}
+                    </Link>{" "}
+                    <span className="text-taupe">· {so.shippingMethodName} · {etaLabel(so.etaMinDays, so.etaMaxDays).toLowerCase()}</span>
+                  </span>
+                  <StatusPill status={so.status} />
+                </div>
+                {so.shipments.map((sh) => (
+                  <div key={sh.id} className="mt-2 text-xs text-graphite">
+                    {sh.carrier} {sh.trackingNumber}
+                    {sh.trackingUrl && (
+                      <a href={sh.trackingUrl} target="_blank" rel="noopener noreferrer" className="ml-2 underline underline-offset-4">
+                        Track
+                      </a>
+                    )}
+                    <ol className="mt-1 space-y-0.5 text-taupe">
+                      {sh.tracking.map((t) => (
+                        <li key={t.id}>
+                          {formatDate(t.occurredAt, { dateStyle: "medium", timeStyle: "short" })} — {t.description}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section>
         <h3 className="eyebrow mb-4">Timeline</h3>

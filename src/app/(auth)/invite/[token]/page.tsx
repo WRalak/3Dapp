@@ -13,7 +13,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <>
       <p className="eyebrow mb-3 text-taupe">Staff invitation</p>
-      <h1 className="mb-8 text-4xl font-medium tracking-tight">Join Atelier</h1>
+      <h1 className="mb-8 text-4xl font-medium tracking-tight">Join Mtindo</h1>
       {valid ? <AcceptInvitationForm token={token} email={invite.email} /> : <FormError message="This invitation is invalid, has expired or has already been used." />}
     </>
   );

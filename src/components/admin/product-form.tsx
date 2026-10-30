@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { GARMENT_KINDS, productInputSchema, type ProductInput } from "@/lib/validation/admin";
 import { createProductAction, updateProductAction } from "@/features/admin/actions";
+import { sellerSaveProductAction } from "@/features/marketplace/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, FormError, Input, NativeSelect, Textarea } from "@/components/ui/form-controls";
 
@@ -23,6 +24,8 @@ export function ProductForm({
   categories,
   collections,
   canPublish,
+  mode = "admin",
+  sellers,
 }: {
   productId?: string;
   defaults: ProductInput;
@@ -30,6 +33,10 @@ export function ProductForm({
   categories: Option[];
   collections: Option[];
   canPublish: boolean;
+  /** "seller": saves through the seller-scoped action (ownership enforced server-side). */
+  mode?: "admin" | "seller";
+  /** Admin only: reassign which seller lists the product. */
+  sellers?: Option[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +47,15 @@ export function ProductForm({
 
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
-    const res = productId ? await updateProductAction({ ...values, id: productId }) : await createProductAction(values);
+    const res =
+      mode === "seller" ? await sellerSaveProductAction({ ...values, id: productId }) : productId ? await updateProductAction({ ...values, id: productId }) : await createProductAction(values);
     if (!res.ok) {
       setError(res.error);
       for (const [k, msgs] of Object.entries(res.fieldErrors ?? {})) form.setError(k as keyof ProductInput, { message: msgs[0] });
       return;
     }
-    toast.success(productId ? "Product saved" : "Product created");
-    if (!productId && "id" in res.data) router.push(`/admin/products/${(res.data as { id: string }).id}`);
+    toast.success(productId ? "Product saved" : mode === "seller" ? "Submitted for review" : "Product created");
+    if (!productId && "id" in res.data) router.push(`/${mode}/products/${(res.data as { id: string }).id}`);
     else router.refresh();
   });
 
@@ -108,7 +116,22 @@ export function ProductForm({
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Status" error={e.status?.message} hint={canPublish ? undefined : "You need publish permission to change this"}>
+        {sellers && (
+          <Field label="Seller" error={e.sellerId?.message} hint="Which store lists this product">
+            <NativeSelect {...register("sellerId")}>
+              {sellers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        )}
+        <Field
+          label="Status"
+          error={e.status?.message}
+          hint={mode === "seller" ? "Published listings appear once our team approves them" : canPublish ? undefined : "You need publish permission to change this"}
+        >
           <NativeSelect disabled={!canPublish} {...register("status")}>
             <option value="DRAFT">Draft</option>
             <option value="PUBLISHED">Published</option>
@@ -127,7 +150,7 @@ export function ProductForm({
         <Field label="Tags" error={e.tags?.message} hint="Comma separated" className="md:col-span-2">
           <Input {...register("tags")} />
         </Field>
-        <Checkbox label="Feature on the homepage" {...register("isFeatured")} />
+        {mode === "admin" && <Checkbox label="Feature on the homepage" {...register("isFeatured")} />}
       </section>
 
       <section className="grid gap-4 border bg-surface p-6 md:grid-cols-3">

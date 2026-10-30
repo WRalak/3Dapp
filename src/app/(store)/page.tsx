@@ -9,11 +9,15 @@ import { ShowroomPreview } from "@/components/showroom/showroom-preview";
 import { NewsletterForm } from "@/components/store/newsletter-form";
 import { HeroMotion } from "@/components/store/hero-motion";
 import { garmentArtwork } from "@/lib/media";
+import { getT, isLiteMode } from "@/i18n/server";
+import { listPublicSellers } from "@/server/services/seller.service";
+import { LiteToggle } from "@/components/store/preferences";
 
-export const revalidate = 120;
+// Per-request: language and Lite mode come from cookies.
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [home, rail] = await Promise.all([getHomeData(), getShowroomItems()]);
+  const [home, rail, t, lite, designers] = await Promise.all([getHomeData(), getShowroomItems(), getT(), isLiteMode(), listPublicSellers({ featured: true, take: 6 })]);
   const currency = env().STORE_CURRENCY;
   const hero = home.blocks.find((b) => b.placement === "home.hero");
   const promo = home.blocks.find((b) => b.placement === "home.promo");
@@ -33,15 +37,15 @@ export default async function HomePage() {
       {/* Editorial hero */}
       <section className="container-luxe grid min-h-[78vh] items-end gap-10 pb-12 pt-10 md:grid-cols-12 md:pb-20 md:pt-16">
         <HeroMotion className="md:col-span-7">
-          <p className="eyebrow mb-6 text-taupe">{hero?.subtitle ?? "New season"}</p>
-          <h1 className="text-display font-medium">{hero?.title ?? "Walk the rail."}</h1>
-          <p className="mt-8 max-w-md text-base leading-relaxed text-graphite md:text-lg">{hero?.body}</p>
+          <p className="eyebrow mb-6 text-taupe">{hero?.subtitle ?? t("home.heroEyebrow")}</p>
+          <h1 className="text-display font-medium">{hero?.title ?? t("home.heroTitle")}</h1>
+          <p className="mt-8 max-w-md text-base leading-relaxed text-graphite md:text-lg">{hero?.body ?? t("home.heroBody")}</p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href={hero?.ctaHref ?? "/showroom"}>{hero?.ctaLabel ?? "Enter the showroom"}</Link>
+              <Link href={lite ? "/shop" : (hero?.ctaHref ?? "/showroom")}>{lite ? t("home.shopNow") : (hero?.ctaLabel ?? t("home.enterShowroom"))}</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/shop">Shop the collection</Link>
+              <Link href="/designers">{t("nav.designers")}</Link>
             </Button>
           </div>
         </HeroMotion>
@@ -59,7 +63,7 @@ export default async function HomePage() {
       {/* Featured collections */}
       {home.collections.length > 0 && (
         <section className="container-luxe py-16 md:py-24" aria-labelledby="collections-heading">
-          <SectionHeading eyebrow="Collections" title="Edited for the season" action={<Link href="/collections" className="link-underline text-sm">All collections</Link>} />
+          <SectionHeading eyebrow={t("nav.collections")} title={t("home.collections")} action={<Link href="/collections" className="link-underline text-sm">{t("common.viewAll")}</Link>} />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {home.collections.map((c, i) => (
               <Link key={c.id} href={`/collections/${c.slug}`} className="group relative flex aspect-[4/5] flex-col justify-end overflow-hidden bg-ink p-6 text-ivory">
@@ -78,7 +82,7 @@ export default async function HomePage() {
 
       {/* New arrivals */}
       <section className="container-luxe py-16 md:py-24" aria-labelledby="new-heading">
-        <SectionHeading eyebrow="Just in" title="New arrivals" action={<Link href="/new-arrivals" className="link-underline text-sm">View all</Link>} />
+        <SectionHeading eyebrow={t("nav.newArrivals")} title={t("home.newArrivals")} action={<Link href="/new-arrivals" className="link-underline text-sm">{t("common.viewAll")}</Link>} />
         <ProductGrid products={home.newArrivals} />
       </section>
 
@@ -86,23 +90,31 @@ export default async function HomePage() {
       <section className="py-16 md:py-24" aria-labelledby="showroom-heading">
         <div className="container-luxe">
           <SectionHeading
-            eyebrow="The digital showroom"
-            title="Pick it off the rail"
+            eyebrow={t("nav.showroom")}
+            title={t("home.showroomTitle")}
             action={
               <Button asChild variant="outline">
                 <Link href="/showroom">
-                  Open showroom <ArrowUpRight />
+                  {t("home.enterShowroom")} <ArrowUpRight />
                 </Link>
               </Button>
             }
           />
         </div>
-        <ShowroomPreview items={rail.slice(0, 10)} currency={currency} />
+        {lite ? (
+          <div className="container-luxe">
+            <p className="border p-6 text-sm text-graphite">
+              {t("home.showroomLite")} <LiteToggle />
+            </p>
+          </div>
+        ) : (
+          <ShowroomPreview items={rail.slice(0, 10)} currency={currency} />
+        )}
       </section>
 
       {/* Trending */}
       <section className="container-luxe py-16 md:py-24">
-        <SectionHeading eyebrow="Most viewed this fortnight" title="Trending now" />
+        <SectionHeading title={t("home.trending")} />
         <ProductGrid products={home.trending.slice(0, 4)} />
       </section>
 
@@ -123,17 +135,20 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Designers */}
-      {home.brands.length > 0 && (
+      {/* Featured Kenyan designers */}
+      {designers.length > 0 && (
         <section className="container-luxe py-16 md:py-24">
-          <SectionHeading eyebrow="Featured houses" title="The designers" />
+          <SectionHeading eyebrow={t("home.designersEyebrow")} title={t("home.featuredDesigners")} action={<Link href="/designers" className="link-underline text-sm">{t("common.viewAll")}</Link>} />
           <ul className="grid border-t sm:grid-cols-2 lg:grid-cols-3">
-            {home.brands.map((b) => (
-              <li key={b.id} className="border-b sm:odd:border-r lg:border-r lg:[&:nth-child(3n)]:border-r-0">
-                <Link href={`/shop?brand=${b.slug}`} className="group flex h-full flex-col justify-between gap-6 p-8 transition-colors hover:bg-bone">
-                  <span className="text-2xl font-medium tracking-tight">{b.name}</span>
+            {designers.map((d) => (
+              <li key={d.id} className="border-b sm:odd:border-r lg:border-r lg:[&:nth-child(3n)]:border-r-0">
+                <Link href={`/designers/${d.slug}`} className="group flex h-full flex-col justify-between gap-6 p-8 transition-colors hover:bg-bone">
+                  <span>
+                    <span className="block text-2xl font-medium tracking-tight">{d.businessName}</span>
+                    <span className="mt-1 block text-xs text-taupe">{[d.town, d.county?.name].filter(Boolean).join(", ")}</span>
+                  </span>
                   <span className="flex items-end justify-between gap-4 text-sm text-taupe">
-                    {b.description}
+                    <span className="line-clamp-2">{d.profile?.description}</span>
                     <ArrowUpRight className="size-4 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </span>
                 </Link>
@@ -145,7 +160,7 @@ export default async function HomePage() {
 
       {/* Best sellers */}
       <section className="container-luxe py-16 md:py-24">
-        <SectionHeading eyebrow="Customer favourites" title="Best sellers" action={<Link href="/shop?sort=best-selling" className="link-underline text-sm">Shop best sellers</Link>} />
+        <SectionHeading title={t("home.bestSellers")} action={<Link href="/shop?sort=best-selling" className="link-underline text-sm">{t("common.viewAll")}</Link>} />
         <ProductGrid products={home.bestSellers.slice(0, 4)} />
       </section>
 
@@ -174,7 +189,7 @@ export default async function HomePage() {
         <section className="bg-bone py-16 md:py-24" aria-labelledby="testimonials-heading">
           <div className="container-luxe">
             <p id="testimonials-heading" className="eyebrow mb-10 text-taupe">
-              From our clients
+              {t("home.testimonials")}
             </p>
             <div className="grid gap-10 md:grid-cols-3">
               {testimonials.map((t) => (
@@ -194,8 +209,8 @@ export default async function HomePage() {
       {/* Newsletter */}
       <section className="container-luxe py-16 md:py-24">
         <div className="mx-auto max-w-xl text-center">
-          <p className="eyebrow mb-4 text-taupe">The Atelier letter</p>
-          <h2 className="text-headline font-medium">First look at every drop</h2>
+          <p className="eyebrow mb-4 text-taupe">{t("home.newsletterEyebrow")}</p>
+          <h2 className="text-headline font-medium">{t("home.newsletterTitle")}</h2>
           <div className="mt-8 text-left">
             <NewsletterForm tone="light" />
           </div>

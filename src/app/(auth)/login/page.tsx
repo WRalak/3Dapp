@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <>
       <h1 className="text-4xl font-medium tracking-tight">Welcome back</h1>
       <p className="mb-8 mt-3 text-sm text-taupe">
-        New to Atelier?{" "}
+        New to Mtindo?{" "}
         <Link href="/register" className="text-ink underline underline-offset-4">
           Create an account
         </Link>

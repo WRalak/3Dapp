@@ -1,3 +1,4 @@
+import { PhoneVerification } from "@/components/marketplace/phone-verify";
 import { requireUserPage } from "@/lib/auth/guards";
 import { db } from "@/lib/db/prisma";
 import { formatDate } from "@/lib/utils";
@@ -13,6 +14,7 @@ function device(ua: string | null) {
 }
 
 export default async function SecurityPage() {
+  const phoneRow = await phoneFor();
   const user = await requireUserPage("/account/security");
   const [record, sessions] = await Promise.all([
     db.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true, mfaEnabled: true } }),
@@ -20,6 +22,11 @@ export default async function SecurityPage() {
   ]);
   return (
     <div className="space-y-12">
+      <section>
+        <h2 className="mb-2 text-xl font-medium tracking-tight">Phone number</h2>
+        <p className="mb-4 text-sm text-taupe">A verified number lets designers&apos; riders reach you and protects your account.</p>
+        <PhoneVerification phone={phoneRow?.phone ?? null} verified={!!phoneRow?.phoneVerifiedAt} />
+      </section>
       <section>
         <h2 className="mb-6 text-xl font-medium tracking-tight">Password</h2>
         <PasswordForm hasPassword={!!record.passwordHash} />
@@ -46,4 +53,11 @@ export default async function SecurityPage() {
       {user.isStaff && <p className="text-sm text-taupe">Two-factor authentication: {record.mfaEnabled ? "enabled" : "not enabled"}.</p>}
     </div>
   );
+}
+
+async function phoneFor() {
+  const { requireUserPage: req } = await import("@/lib/auth/guards");
+  const { db: client } = await import("@/lib/db/prisma");
+  const u = await req("/account/security");
+  return client.user.findUnique({ where: { id: u.id }, select: { phone: true, phoneVerifiedAt: true } });
 }

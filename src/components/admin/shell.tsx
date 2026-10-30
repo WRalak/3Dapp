@@ -20,12 +20,25 @@ import {
   Newspaper,
   Settings,
   X,
+  Store,
+  BadgeCheck,
+  Flag,
+  Landmark,
+  Truck,
+  MessageCircle,
+  Wallet,
+  Megaphone,
+  MapPinned,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Permission } from "@/lib/auth/permissions";
 
 const NAV: { href: string; label: string; icon: typeof Box; perm?: Permission }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/sellers", label: "Sellers", icon: Store, perm: "sellers.view" },
+  { href: "/admin/approvals", label: "Listing approvals", icon: BadgeCheck, perm: "products.approve" },
+  { href: "/admin/reports", label: "Reports", icon: Flag, perm: "reports.manage" },
+  { href: "/admin/finance", label: "Finance & payouts", icon: Landmark, perm: "finance.view" },
   { href: "/admin/products", label: "Products", icon: Package, perm: "products.view" },
   { href: "/admin/3d-assets", label: "3D assets", icon: Box, perm: "assets.manage" },
   { href: "/admin/categories", label: "Categories & brands", icon: FolderTree, perm: "categories.manage" },
@@ -34,23 +47,52 @@ const NAV: { href: string; label: string; icon: typeof Box; perm?: Permission }[
   { href: "/admin/customers", label: "Customers", icon: Users, perm: "customers.view" },
   { href: "/admin/inventory", label: "Inventory", icon: Warehouse, perm: "inventory.view" },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3, perm: "analytics.view" },
-  { href: "/admin/content", label: "Content & promotions", icon: Newspaper, perm: "content.manage" },
+  { href: "/admin/content", label: "Content & coupons", icon: Newspaper, perm: "content.manage" },
+  { href: "/admin/promotions", label: "Campaigns", icon: Megaphone, perm: "promotions.manage" },
+  { href: "/admin/delivery", label: "Counties & delivery", icon: MapPinned, perm: "delivery.manage" },
   { href: "/admin/staff", label: "Staff", icon: UserCog, perm: "staff.view" },
   { href: "/admin/roles", label: "Roles & permissions", icon: Shield, perm: "roles.manage" },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText, perm: "audit.view" },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-export function AdminShell({ user, permissions, children, signOut }: { user: { name: string | null; email: string; roles: string[] }; permissions: Permission[]; children: React.ReactNode; signOut: () => Promise<void> }) {
+const SELLER_NAV: typeof NAV = [
+  { href: "/seller", label: "Overview", icon: LayoutDashboard },
+  { href: "/seller/products", label: "Products", icon: Package },
+  { href: "/seller/inventory", label: "Inventory", icon: Warehouse },
+  { href: "/seller/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/seller/inquiries", label: "Messages", icon: MessageCircle },
+  { href: "/seller/delivery", label: "Delivery", icon: Truck },
+  { href: "/seller/earnings", label: "Earnings & payouts", icon: Wallet },
+  { href: "/seller/profile", label: "Store profile", icon: Store },
+];
+
+export function AdminShell({
+  user,
+  permissions,
+  children,
+  signOut,
+  variant = "admin",
+  storeName,
+}: {
+  user: { name: string | null; email: string; roles: string[] };
+  permissions: Permission[];
+  children: React.ReactNode;
+  signOut: () => Promise<void>;
+  variant?: "admin" | "seller";
+  storeName?: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const root = variant === "seller" ? "/seller" : "/admin";
+  const label = variant === "seller" ? "Seller" : "Admin";
   // Navigation is filtered for usability only — every page and action re-checks on the server.
-  const items = NAV.filter((n) => !n.perm || permissions.includes(n.perm) || (n.perm === "content.manage" && permissions.includes("promotions.manage")));
+  const items = variant === "seller" ? SELLER_NAV : NAV.filter((n) => !n.perm || permissions.includes(n.perm));
 
   const nav = (
     <nav aria-label="Admin" className="space-y-0.5">
       {items.map((item) => {
-        const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+        const active = item.href === root ? pathname === root : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
           <Link
@@ -72,18 +114,18 @@ export function AdminShell({ user, permissions, children, signOut }: { user: { n
     <div className="min-h-dvh bg-ivory lg:grid lg:grid-cols-[248px_1fr]">
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-[248px] flex-col bg-ink p-4 text-ivory transition-transform lg:sticky lg:top-0 lg:flex lg:h-dvh lg:translate-x-0", open ? "flex translate-x-0" : "hidden -translate-x-full lg:flex")}>
         <div className="mb-8 flex items-center justify-between px-3 pt-2">
-          <Link href="/admin" className="text-sm font-medium uppercase tracking-[0.36em]">
-            Atelier
+          <Link href={root} className="text-sm font-medium uppercase tracking-[0.36em]">
+            Mtindo
           </Link>
-          <span className="text-[10px] uppercase tracking-[0.16em] text-stone">Admin</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-stone">{label}</span>
           <button type="button" className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
             <X className="size-4" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">{nav}</div>
         <div className="mt-6 border-t border-ivory/10 px-3 pt-4 text-xs">
-          <p className="truncate text-ivory">{user.name ?? user.email}</p>
-          <p className="truncate text-stone">{user.roles.join(", ").replace(/_/g, " ").toLowerCase()}</p>
+          <p className="truncate text-ivory">{storeName ?? user.name ?? user.email}</p>
+          <p className="truncate text-stone">{variant === "seller" ? user.email : user.roles.join(", ").replace(/_/g, " ").toLowerCase()}</p>
           <div className="mt-3 flex gap-4">
             <Link href="/" className="text-stone underline-offset-4 hover:text-ivory hover:underline">
               Storefront
@@ -96,10 +138,10 @@ export function AdminShell({ user, permissions, children, signOut }: { user: { n
       </aside>
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex h-14 items-center border-b bg-ivory/90 px-4 backdrop-blur lg:hidden">
-          <button type="button" onClick={() => setOpen(true)} aria-label="Open admin menu" className="p-2">
+          <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="p-2">
             <Menu className="size-5" />
           </button>
-          <span className="ml-2 text-sm font-medium uppercase tracking-[0.3em]">Atelier admin</span>
+          <span className="ml-2 text-sm font-medium uppercase tracking-[0.3em]">Mtindo {label.toLowerCase()}</span>
         </header>
         <main id="main" className="px-4 py-8 md:px-8 lg:px-10">
           {children}

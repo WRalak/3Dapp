@@ -20,7 +20,7 @@ export default async function AccountOverview({ searchParams }: { searchParams: 
 
   return (
     <div className="space-y-10">
-      {sp.welcome && <p className="border border-success/30 bg-success/5 p-4 text-sm text-success">Welcome to Atelier — your account is ready.</p>}
+      {sp.welcome && <p className="border border-success/30 bg-success/5 p-4 text-sm text-success">Welcome to Mtindo — your account is ready.</p>}
       {!user.emailVerified && (
         <div className="flex flex-wrap items-center justify-between gap-4 border border-warning/40 bg-warning/5 p-4 text-sm">
           <span>Please confirm your email address to secure your account.</span>

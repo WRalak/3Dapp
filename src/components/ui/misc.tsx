@@ -20,7 +20,7 @@ export function Badge({ tone = "neutral", className, children }: { tone?: keyof 
   return <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em]", badgeTones[tone], className)}>{children}</span>;
 }
 
-export function Price({ cents, compareAt, currency = "USD", className }: { cents: number; compareAt?: number | null; currency?: string; className?: string }) {
+export function Price({ cents, compareAt, currency = "KES", className }: { cents: number; compareAt?: number | null; currency?: string; className?: string }) {
   return (
     <span className={cn("inline-flex items-baseline gap-2 tabular-nums", className)}>
       <span className={cn(compareAt ? "text-clay" : undefined)}>{formatMoney(cents, currency)}</span>

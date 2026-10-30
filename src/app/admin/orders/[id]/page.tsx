@@ -26,6 +26,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
       payments: { orderBy: { createdAt: "desc" } },
       refunds: { orderBy: { createdAt: "desc" } },
       shipments: { orderBy: { createdAt: "desc" } },
+      sellerOrders: { include: { seller: { select: { id: true, businessName: true } } }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!order) notFound();
@@ -83,8 +84,9 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
                 trigger={<Button size="sm" variant="outline">Refund</Button>}
                 action={refundOrderAction}
                 extra={{ orderId: order.id }}
-                defaults={{ amount: (paid.amountCents - refundedCents) / 100, reason: "", restock: true }}
+                defaults={{ amount: (paid.amountCents - refundedCents) / 100, reason: "", restock: true, sellerOrderId: order.sellerOrders.length === 1 ? order.sellerOrders[0]!.id : "" }}
                 fields={[
+                  { name: "sellerOrderId", label: "Charge to seller", type: "select", options: order.sellerOrders.map((so) => ({ value: so.id, label: `${so.seller.businessName} (${m(so.totalCents)})` })), hint: "Empty = split across all sellers", span: 2 },
                   { name: "amount", label: `Amount (${order.currency})`, type: "number", hint: `Up to ${m(paid.amountCents - refundedCents)}` },
                   { name: "reason", label: "Reason", type: "textarea" },
                   { name: "restock", label: "Return items to stock (full refunds before shipping)", type: "checkbox", span: 2 },
@@ -164,6 +166,40 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
               </TR>
             </tbody>
           </Table>
+
+          <section>
+            <h2 className="eyebrow mb-3">Sellers in this order</h2>
+            <Table>
+              <THead>
+                <tr>
+                  <TH>Seller</TH>
+                  <TH>Delivery</TH>
+                  <TH>Status</TH>
+                  <TH className="text-right">Total</TH>
+                  <TH className="text-right">Commission</TH>
+                  <TH className="text-right">Seller net</TH>
+                </tr>
+              </THead>
+              <tbody>
+                {order.sellerOrders.map((so) => (
+                  <TR key={so.id}>
+                    <TD>
+                      <Link href={`/admin/sellers/${so.seller.id}`} className="underline-offset-4 hover:underline">
+                        {so.seller.businessName}
+                      </Link>
+                    </TD>
+                    <TD className="text-xs">{so.shippingMethodName}</TD>
+                    <TD>
+                      <StatusPill status={so.status} />
+                    </TD>
+                    <TD className="text-right tabular-nums">{m(so.totalCents)}</TD>
+                    <TD className="text-right tabular-nums">{m(so.commissionCents)}</TD>
+                    <TD className="text-right tabular-nums">{m(so.sellerNetCents)}</TD>
+                  </TR>
+                ))}
+              </tbody>
+            </Table>
+          </section>
 
           <section>
             <h2 className="eyebrow mb-3">Payments</h2>

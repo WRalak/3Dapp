@@ -1,7 +1,7 @@
 import { requireAdminPage } from "@/lib/auth/guards";
 import { env } from "@/config/env";
 import { analyticsRangeSchema } from "@/lib/validation/admin";
-import { analyticsSummary, customerAcquisition, inventoryPerformance, productPerformance, resolveRange, revenueSeries, salesByCategory } from "@/server/services/analytics.service";
+import { analyticsSummary, customerAcquisition, inventoryPerformance, paymentsByMethod, productPerformance, resolveRange, revenueSeries, salesByCategory, salesByCounty, salesBySeller } from "@/server/services/analytics.service";
 import { formatMoney } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/admin/shell";
 import { CategoryChart, CountChart, RevenueChart } from "@/components/admin/charts";
@@ -19,13 +19,16 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const from = range.from.toISOString().slice(0, 10);
   const to = range.to.toISOString().slice(0, 10);
   const currency = env().STORE_CURRENCY;
-  const [summary, series, customers, categories, products, inventory] = await Promise.all([
+  const [summary, series, customers, categories, products, inventory, counties, sellers, methods] = await Promise.all([
     analyticsSummary(range),
     revenueSeries(range),
     customerAcquisition(range),
     salesByCategory(range),
     productPerformance(range, 10),
     inventoryPerformance(10),
+    salesByCounty(range),
+    salesBySeller(range, 15),
+    paymentsByMethod(range),
   ]);
   const m = (c: number) => formatMoney(c, currency);
   const csv = (report: string) => `/api/admin/analytics/export?report=${report}&from=${from}&to=${to}`;
@@ -144,6 +147,73 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </tbody>
         </Table>
       </section>
+      <div className="mt-8 grid gap-8 xl:grid-cols-3">
+        <section>
+          <h2 className="eyebrow mb-3">Sales by county</h2>
+          <Table>
+            <THead>
+              <tr>
+                <TH>County</TH>
+                <TH className="text-right">Orders</TH>
+                <TH className="text-right">Revenue</TH>
+              </tr>
+            </THead>
+            <tbody>
+              {counties.map((r) => (
+                <TR key={r.county}>
+                  <TD>{r.county}</TD>
+                  <TD className="text-right tabular-nums">{r.orders}</TD>
+                  <TD className="text-right tabular-nums">{m(r.revenueCents)}</TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+        </section>
+        <section>
+          <h2 className="eyebrow mb-3">Sales by seller</h2>
+          <Table>
+            <THead>
+              <tr>
+                <TH>Seller</TH>
+                <TH className="text-right">GMV</TH>
+                <TH className="text-right">Commission</TH>
+              </tr>
+            </THead>
+            <tbody>
+              {sellers.map((r) => (
+                <TR key={r.sellerId}>
+                  <TD>{r.seller}</TD>
+                  <TD className="text-right tabular-nums">{m(r.gmvCents)}</TD>
+                  <TD className="text-right tabular-nums">{m(r.commissionCents)}</TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+        </section>
+        <section>
+          <h2 className="eyebrow mb-3">Payment methods</h2>
+          <Table>
+            <THead>
+              <tr>
+                <TH>Method</TH>
+                <TH className="text-right">Success</TH>
+                <TH className="text-right">Failed</TH>
+                <TH className="text-right">Collected</TH>
+              </tr>
+            </THead>
+            <tbody>
+              {methods.map((r) => (
+                <TR key={r.provider}>
+                  <TD>{r.provider === "MPESA" ? "M-Pesa" : r.provider.toLowerCase()}</TD>
+                  <TD className="text-right tabular-nums">{r.succeeded}</TD>
+                  <TD className="text-right tabular-nums">{r.failed}</TD>
+                  <TD className="text-right tabular-nums">{m(r.amountCents)}</TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+        </section>
+      </div>
     </>
   );
 }

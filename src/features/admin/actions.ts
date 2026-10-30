@@ -172,9 +172,9 @@ export const cancelOrderAction = action(cancelOrderSchema, async ({ orderId, rea
   return { message: "Order cancelled and stock released" };
 });
 
-export const refundOrderAction = action(refundSchema, async ({ orderId, amount, reason, restock }) => {
+export const refundOrderAction = action(refundSchema, async ({ orderId, sellerOrderId, amount, reason, restock }) => {
   const user = await requirePermission("orders.refund");
-  const result = await refundOrder({ orderId, amountCents: Math.round(amount * 100), reason, restock }, user);
+  const result = await refundOrder({ orderId, sellerOrderId: sellerOrderId || undefined, amountCents: Math.round(amount * 100), reason, restock }, user);
   revalidatePath(`/admin/orders/${orderId}`);
   return { message: result.status === "SUCCEEDED" ? "Refund issued" : `Refund recorded as ${result.status.toLowerCase()}${result.failureReason ? ` — ${result.failureReason}` : ""}` };
 });

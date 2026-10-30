@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "3D Showroom",
-  description: "Browse the Atelier collection on a virtual clothing rail. Slide, pick and inspect every piece in 3D.",
+  description: "Browse independent Kenyan designers on a virtual clothing rail. Slide, pick and inspect every piece in 3D.",
 };
 
 export default async function ShowroomPage({ searchParams }: { searchParams: Promise<{ category?: string; collection?: string; mode?: string }> }) {

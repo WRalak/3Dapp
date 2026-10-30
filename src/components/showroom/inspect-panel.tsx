@@ -10,6 +10,8 @@ import { isSvgSource } from "@/lib/media";
 import { useShowroomStore } from "@/stores/showroom-store";
 import { PurchasePanel } from "@/components/products/purchase-panel";
 import { Skeleton } from "@/components/ui/misc";
+import { DeliveryCheck } from "@/components/marketplace/delivery-check";
+import { RepresentationNotice } from "@/components/marketplace/seller-card";
 import type { ProductDetail, ShowroomItem } from "@/types/catalog";
 
 export function InspectControls({ onReturn }: { onReturn?: () => void }) {
@@ -130,6 +132,13 @@ export function InspectOverlay({ item, currency, compact }: { item: ShowroomItem
       >
         <p className="eyebrow text-taupe">{item.brand}</p>
         <h2 className="mt-2 text-2xl font-medium tracking-tight">{item.name}</h2>
+        <p className="mt-2 text-xs text-graphite">
+          by{" "}
+          <Link href={`/designers/${item.seller.slug}`} className="underline underline-offset-4">
+            {item.seller.name}
+          </Link>
+          {item.seller.town || item.seller.county ? ` · ${[item.seller.town, item.seller.county].filter(Boolean).join(", ")}` : ""}
+        </p>
         <div className="mt-6">
           {isLoading ? (
             <div className="space-y-3">
@@ -142,6 +151,10 @@ export function InspectOverlay({ item, currency, compact }: { item: ShowroomItem
           ) : (
             <>
               <PurchasePanel product={product} currency={currency} compact />
+              <div className="mt-5 space-y-3">
+                <DeliveryCheck sellerId={item.seller.id} amountCents={product.priceCents} currency={currency} compact />
+                <RepresentationNotice modelAccurate={product.model ? product.model.representation === "ACCURATE" : null} hasPhotos={!product.imagesAreIllustrative} />
+              </div>
               {!compact && (
                 <div className="mt-8">
                   <ProductFacts product={product} />

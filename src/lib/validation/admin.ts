@@ -134,6 +134,8 @@ export const cancelOrderSchema = z.object({
 
 export const refundSchema = z.object({
   orderId: z.string().min(1),
+  /** Charge the refund to one seller's part of the order; empty = spread across sellers. */
+  sellerOrderId: z.string().optional().or(z.literal("")),
   amount: z.coerce.number().positive("Enter an amount").max(1_000_000),
   reason: z.string().trim().min(3).max(500),
   restock: z.boolean().default(true),
