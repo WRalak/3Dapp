@@ -49,6 +49,7 @@ Status of each phase in the brief, with how it was verified. Everything listed a
 5. The worker failed under the `react-server` resolution condition; it now runs with a dedicated tsconfig.
 6. In production without SMTP, email bodies (containing one-time tokens) would have been logged; production now fails the job instead.
 7. The DB client was created at import time, which would break `docker build` without a database; it is now lazy.
+8. A streaming `loading.tsx` on product pages turned missing products into soft 404s (HTTP 200); it was removed and e2e now asserts a real 404.
 
 ## Known limitations and follow-ups
 
