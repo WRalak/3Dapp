@@ -31,7 +31,7 @@ function Turntable({ model, kind, color, segments }: { model: Model3DData | null
     state.camera.position.z = THREE.MathUtils.damp(state.camera.position.z, s.zoom, 6, delta);
   });
   return (
-    <group ref={ref} position={[0, 0.15, 0]}>
+    <group ref={ref} position={[0, 0.02, 0]}>
       <Garment model={model} kind={kind} color={color} loadModel segments={segments} />
     </group>
   );
