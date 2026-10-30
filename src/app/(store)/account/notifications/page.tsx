@@ -8,7 +8,7 @@ import { MarkAllRead, NotificationPrefsForm } from "../account-forms";
 
 export const metadata = { title: "Notifications" };
 
-const TYPE_LABEL = { ORDER_UPDATE: "Order", DELIVERY: "Delivery", PROMOTION: "Promotion", RESTOCK: "Restock", SYSTEM: "Account" } as const;
+const TYPE_LABEL = { ORDER_UPDATE: "Order", DELIVERY: "Delivery", PROMOTION: "Promotion", RESTOCK: "Restock", SYSTEM: "Account", SELLER: "Seller", INQUIRY: "Message", PAYOUT: "Payout" } as const;
 
 export default async function NotificationsPage() {
   const user = await requireUserPage("/account/notifications");

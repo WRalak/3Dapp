@@ -5,7 +5,7 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self), usb=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=(self), usb=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@node-rs/argon2", "pino", "ioredis", "pg"],
   images: {
     formats: ["image/avif", "image/webp"],
+    // 45 is used in Lite (low-bandwidth) mode; 75 is the default.
+    qualities: [45, 75],
     deviceSizes: [390, 640, 828, 1080, 1440, 1920],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [{ protocol: "https", hostname: "lh3.googleusercontent.com" }, { protocol: "https", hostname: "res.cloudinary.com" }, ...remoteHosts],

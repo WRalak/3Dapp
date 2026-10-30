@@ -4,8 +4,10 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
+import type { Locale } from "@/config/locale";
+import { LocaleProvider } from "@/i18n/client";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children, locale, lite }: { children: React.ReactNode; locale: Locale; lite: boolean }) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -14,8 +16,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
-      {/* Respect the user's OS-level reduced-motion preference for every animation. */}
-      <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      <LocaleProvider locale={locale} lite={lite}>
+        {/* Respect the user's OS-level reduced-motion preference for every animation. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      </LocaleProvider>
       <Toaster
         position="bottom-center"
         toastOptions={{

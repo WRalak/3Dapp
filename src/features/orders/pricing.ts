@@ -112,10 +112,79 @@ export function computeTotals(input: TotalsInput): Totals {
   };
 }
 
-/** Human-friendly order number: AT-YYMMDD-XXXXX (no ambiguous characters). */
+/** Human-friendly order number: MT-YYMMDD-XXXXX in East Africa Time (no ambiguous characters). Also the M-Pesa Paybill account number. */
 export function generateOrderNumber(now = new Date(), rand: () => number = Math.random) {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const suffix = Array.from({ length: 5 }, () => alphabet[Math.floor(rand() * alphabet.length)]).join("");
-  const d = now.toISOString().slice(2, 10).replace(/-/g, "");
-  return `AT-${d}-${suffix}`;
+  const eat = new Date(now.getTime() + 3 * 3600_000);
+  const d = eat.toISOString().slice(2, 10).replace(/-/g, "");
+  return `MT-${d}-${suffix}`;
+}
+
+export interface MarketplaceTotalsInput {
+  /** Lines at their effective unit price (sale prices already applied). */
+  lines: { unitPriceCents: number; quantity: number }[];
+  /** Sum of automatic promotion discounts across lines. */
+  promotionDiscountCents: number;
+  coupon?: CouponRule | null;
+  /** Sum of the delivery fees chosen per seller (0 until chosen). */
+  shippingCents: number;
+  taxRateBps: number;
+  taxInclusive: boolean;
+  now?: Date;
+}
+
+export interface MarketplaceTotals {
+  subtotalCents: number;
+  promotionDiscountCents: number;
+  couponDiscountCents: number;
+  discountCents: number;
+  shippingCents: number;
+  taxCents: number;
+  totalCents: number;
+  couponCode: string | null;
+  couponError: string | null;
+  freeShipping: boolean;
+}
+
+/**
+ * Multi-seller totals. Coupons are platform-wide and apply after promotions; a FREE_SHIPPING
+ * coupon waives every seller's delivery fee (platform-funded).
+ */
+export function computeMarketplaceTotals(input: MarketplaceTotalsInput): MarketplaceTotals {
+  const now = input.now ?? new Date();
+  const subtotalCents = input.lines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0);
+  const promotionDiscountCents = Math.min(input.promotionDiscountCents, subtotalCents);
+  const afterPromo = subtotalCents - promotionDiscountCents;
+
+  let couponDiscountCents = 0;
+  let couponError: string | null = null;
+  let couponCode: string | null = null;
+  let freeShipping = false;
+  if (input.coupon) {
+    couponError = couponProblem(input.coupon, afterPromo, now);
+    if (!couponError) {
+      couponCode = input.coupon.code;
+      if (input.coupon.type === "PERCENTAGE") couponDiscountCents = Math.floor((afterPromo * Math.min(input.coupon.value, 100)) / 100);
+      else if (input.coupon.type === "FIXED") couponDiscountCents = Math.min(input.coupon.value, afterPromo);
+      else freeShipping = true;
+    }
+  }
+  const discountCents = promotionDiscountCents + couponDiscountCents;
+  const merchandise = subtotalCents - discountCents;
+  const shippingCents = freeShipping ? 0 : input.shippingCents;
+  const rate = input.taxRateBps / 10_000;
+  const taxCents = input.taxInclusive ? Math.round(merchandise - merchandise / (1 + rate)) : Math.round(merchandise * rate);
+  return {
+    subtotalCents,
+    promotionDiscountCents,
+    couponDiscountCents,
+    discountCents,
+    shippingCents,
+    taxCents,
+    totalCents: merchandise + shippingCents + (input.taxInclusive ? 0 : taxCents),
+    couponCode,
+    couponError,
+    freeShipping,
+  };
 }

@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { resetBrowser } from "../support/request-mock";
-import { createUser, ensureRoles, testDb, uid } from "../support/factories";
+import { createSeller, createUser, ensureRoles, testDb, uid } from "../support/factories";
 import { createSession } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/guards";
 import { createProduct, deleteProduct, updateProduct } from "@/server/services/product-admin.service";
@@ -103,7 +103,8 @@ describe("inventory", () => {
 
   it("database constraints forbid negative stock", async () => {
     const { brand, category, s } = await fixtures();
-    const p = await testDb.product.create({ data: { name: s, slug: s, description: "x", brandId: brand.id, categoryId: category.id, priceCents: 1 } });
+    const { seller } = await createSeller();
+    const p = await testDb.product.create({ data: { name: s, slug: s, description: "x", brandId: brand.id, categoryId: category.id, priceCents: 1, sellerId: seller.id } });
     const v = await testDb.productVariant.create({ data: { productId: p.id, sku: s.toUpperCase(), size: "M", color: "X", colorHex: "#000000" } });
     await expect(testDb.inventory.create({ data: { variantId: v.id, quantity: -1 } })).rejects.toBeTruthy();
   });

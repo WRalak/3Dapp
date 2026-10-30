@@ -19,6 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ key: st
   const type = TYPES[ext];
   try {
     assertSafeKey(key);
+    if (key.startsWith("private/")) throw new Error("private");
     if (!type) throw new Error("type");
     const body = await storage().read(key);
     return new Response(new Uint8Array(body), {

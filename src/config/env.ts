@@ -27,9 +27,18 @@ const schema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
 
-  STORE_CURRENCY: z.string().length(3).default("USD"),
+  STORE_CURRENCY: z.string().length(3).default("KES"),
   TAX_RATE_BPS: z.coerce.number().int().min(0).max(10000).default(1600),
-  TAX_INCLUSIVE: bool.default(false),
+  // Kenyan retail prices include 16% VAT.
+  TAX_INCLUSIVE: z
+    .enum(["true", "false", "1", "0"])
+    .optional()
+    .transform((v) => v === undefined || v === "true" || v === "1"),
+  /** Platform commission (basis points) when neither the seller nor the category overrides it. */
+  DEFAULT_COMMISSION_BPS: z.coerce.number().int().min(0).max(10000).default(1200),
+  /** Days after delivery before seller earnings become withdrawable (returns window). */
+  SELLER_PAYOUT_HOLD_DAYS: z.coerce.number().int().min(0).max(60).default(7),
+  MIN_PAYOUT_CENTS: z.coerce.number().int().min(0).default(100000),
 
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   STORAGE_LOCAL_DIR: z.string().default("./storage"),
@@ -57,6 +66,17 @@ const schema = z.object({
   MPESA_PASSKEY: z.string().optional(),
   MPESA_CALLBACK_SECRET: z.string().optional(),
   MPESA_KES_RATE: z.coerce.number().positive().optional(),
+  /** Paybill used for C2B "Lipa na M-Pesa" (account number = order number). Defaults to MPESA_SHORTCODE. */
+  MPESA_C2B_SHORTCODE: z.string().optional(),
+  /** Comma-separated Safaricom callback source IPs; when set, C2B/STK callbacks from other IPs are rejected. */
+  MPESA_ALLOWED_IPS: z.string().optional(),
+  MPESA_B2C_INITIATOR: z.string().optional(),
+  MPESA_B2C_SECURITY_CREDENTIAL: z.string().optional(),
+  /** SMS for phone verification: "console" (dev) or "africastalking". */
+  SMS_PROVIDER: z.enum(["console", "africastalking"]).default("console"),
+  AFRICASTALKING_USERNAME: z.string().optional(),
+  AFRICASTALKING_API_KEY: z.string().optional(),
+  AFRICASTALKING_SENDER_ID: z.string().optional(),
   PAYPAL_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_CLIENT_SECRET: z.string().optional(),

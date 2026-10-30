@@ -51,6 +51,8 @@ export const productInputSchema = z
     isFeatured: z.boolean().default(false),
     status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
     collectionIds: z.array(z.string()).default([]),
+    /** Admin only: which seller lists this product (defaults to the house store). Ignored for sellers. */
+    sellerId: z.string().optional().or(z.literal("")),
     variants: z.array(variantInputSchema).min(1, "Add at least one variant").max(200),
   })
   .superRefine((d, ctx) => {

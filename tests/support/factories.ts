@@ -38,8 +38,35 @@ export async function createUser(opts: { role?: RoleKey; password?: string; emai
   });
 }
 
-export async function createProduct(opts: { stock?: number; priceCents?: number; salePriceCents?: number | null } = {}) {
+export async function ensureCounty(name = "Nairobi", code = 47) {
+  return testDb.county.upsert({ where: { code }, update: {}, create: { code, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-") } });
+}
+
+/** An approved seller (with profile + wallet) owned by a fresh SELLER user. */
+export async function createSeller(opts: { status?: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED"; commissionRateBps?: number | null } = {}) {
+  const owner = await createUser({ role: "SELLER", staff: false });
+  const county = await ensureCounty();
+  const slug = uid("s");
+  const seller = await testDb.seller.create({
+    data: {
+      ownerId: owner.id,
+      slug,
+      businessName: `Studio ${slug}`,
+      status: opts.status ?? "APPROVED",
+      countyId: county.id,
+      town: "Nairobi",
+      commissionRateBps: opts.commissionRateBps ?? null,
+      approvedAt: (opts.status ?? "APPROVED") === "APPROVED" ? new Date() : null,
+      profile: { create: { contactName: "Owner", email: owner.email, phone: "+254712345678", description: "A Nairobi studio" } },
+      wallet: { create: {} },
+    },
+  });
+  return { seller, owner, county };
+}
+
+export async function createProduct(opts: { stock?: number; priceCents?: number; salePriceCents?: number | null; sellerId?: string } = {}) {
   const slug = uid("p");
+  const sellerId = opts.sellerId ?? (await createSeller()).seller.id;
   const brand = await testDb.brand.create({ data: { name: `Brand ${slug}`, slug: `b-${slug}` } });
   const category = await testDb.category.create({ data: { name: `Cat ${slug}`, slug: `c-${slug}` } });
   const product = await testDb.product.create({
@@ -50,6 +77,8 @@ export async function createProduct(opts: { stock?: number; priceCents?: number;
       brandId: brand.id,
       categoryId: category.id,
       status: "PUBLISHED",
+      approvalStatus: "APPROVED",
+      sellerId,
       publishedAt: new Date(),
       priceCents: opts.priceCents ?? 10_000,
       salePriceCents: opts.salePriceCents ?? null,

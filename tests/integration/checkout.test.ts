@@ -61,7 +61,7 @@ describe("placing orders", () => {
     await addToCart(variant.id, 2);
     const data = input();
     const order = await placeOrder(data, null, ctx);
-    expect(order).toMatchObject({ status: "PENDING_PAYMENT", subtotalCents: 20000, shippingCents: 800, taxCents: 3200, totalCents: 24000 });
+    expect(order).toMatchObject({ status: "PENDING_PAYMENT", subtotalCents: 20000, shippingCents: 35000, taxCents: 2759, totalCents: 55000 });
     expect(await inventory(variant.id)).toMatchObject({ quantity: 3, reserved: 2 });
     expect((await getCart()).lines).toHaveLength(0);
     const again = await placeOrder(data, null, ctx);

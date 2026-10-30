@@ -20,6 +20,15 @@ export const UPLOAD_KINDS = {
       "application/octet-stream": [".glb"],
     },
   },
+  /** Seller verification documents — stored under the private/ prefix, never served publicly. */
+  document: {
+    maxBytes: 8 * 1024 * 1024,
+    types: {
+      "application/pdf": [".pdf"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+    },
+  },
 } as const;
 
 export type UploadKind = keyof typeof UPLOAD_KINDS;
@@ -47,6 +56,12 @@ export function sniffImage(buf: Uint8Array): "image/jpeg" | "image/png" | "image
     if (brand === "avif" || brand === "avis") return "image/avif";
   }
   return null;
+}
+
+export function sniffDocument(buf: Uint8Array): "application/pdf" | "image/jpeg" | "image/png" | null {
+  if (startsWith(buf, [0x25, 0x50, 0x44, 0x46, 0x2d])) return "application/pdf"; // %PDF-
+  const img = sniffImage(buf);
+  return img === "image/jpeg" || img === "image/png" ? img : null;
 }
 
 export function sanitizeFileName(name: string) {

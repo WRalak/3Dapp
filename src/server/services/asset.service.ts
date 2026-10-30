@@ -25,13 +25,14 @@ export async function createUpload(input: { kind: UploadKind; fileName: string; 
   const problem = validateDeclaredFile(input.kind, input.fileName, input.contentType, input.size);
   if (problem) throw new AppError("VALIDATION", problem);
   const safe = sanitizeFileName(input.fileName);
-  const key = `${input.kind === "model" ? "models" : "images"}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}-${safe}`;
+  const prefix = input.kind === "model" ? "models" : input.kind === "document" ? "private/documents" : "images";
+  const key = `${prefix}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}-${safe}`;
   const upload = await storage().createSignedUpload(key, input.contentType, input.size);
   const claim = signPayload({ key, kind: input.kind, contentType: input.contentType, size: input.size, name: input.fileName.slice(0, 120), uid: actor.id } satisfies UploadClaims, env().AUTH_SECRET, 30 * 60);
   return { upload, claim };
 }
 
-function readClaim(claim: string, actor: AuthUser) {
+export function readClaim(claim: string, actor: AuthUser) {
   const c = verifyPayload<UploadClaims>(claim, env().AUTH_SECRET);
   if (!c || c.uid !== actor.id) throw badRequest("Upload session is invalid or expired");
   return c;

@@ -39,17 +39,17 @@ describe("computeTotals", () => {
 
   it("sums lines, adds shipping and exclusive tax", () => {
     const t = computeTotals({ ...base, lines: [{ unitPriceCents: 5000, quantity: 2 }], shippingMethod: "standard" });
-    expect(t).toMatchObject({ subtotalCents: 10000, discountCents: 0, shippingCents: 800, taxCents: 1600, totalCents: 12400 });
+    expect(t).toMatchObject({ subtotalCents: 10000, discountCents: 0, shippingCents: 35000, taxCents: 1600, totalCents: 46600 });
   });
 
   it("gives free standard shipping above the threshold", () => {
-    const t = computeTotals({ ...base, lines: [{ unitPriceCents: 30000, quantity: 1 }], shippingMethod: "standard" });
+    const t = computeTotals({ ...base, lines: [{ unitPriceCents: 1_000_000, quantity: 1 }], shippingMethod: "standard" });
     expect(t.shippingCents).toBe(0);
     expect(t.freeShippingRemainingCents).toBe(0);
   });
 
   it("reports how much more is needed for free shipping", () => {
-    expect(computeTotals({ ...base, lines: [{ unitPriceCents: 20000, quantity: 1 }], shippingMethod: "standard" }).freeShippingRemainingCents).toBe(5000);
+    expect(computeTotals({ ...base, lines: [{ unitPriceCents: 200_000, quantity: 1 }], shippingMethod: "standard" }).freeShippingRemainingCents).toBe(800_000);
   });
 
   it("applies percentage, fixed and free-shipping coupons", () => {
@@ -106,6 +106,6 @@ describe("shipping & order numbers", () => {
   it("throws for unknown shipping methods", () => expect(() => shippingFor("teleport" as never, 0)).toThrow());
   it("generates readable, unambiguous order numbers", () => {
     const n = generateOrderNumber(new Date("2026-10-30T10:00:00Z"));
-    expect(n).toMatch(/^AT-261030-[A-HJ-NP-Z2-9]{5}$/);
+    expect(n).toMatch(/^MT-261030-[A-HJ-NP-Z2-9]{5}$/);
   });
 });

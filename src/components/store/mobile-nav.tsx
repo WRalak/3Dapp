@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Drawer } from "@/components/ui/dialog";
 import { mainNav } from "@/config/site";
 import { useUiStore } from "@/stores/ui-store";
+import { useT } from "@/i18n/client";
 
 const categories = [
   { label: "Women", href: "/shop?category=women" },
@@ -22,16 +23,17 @@ export function MobileNav({ signedIn }: { signedIn: boolean }) {
   const open = useUiStore((s) => s.mobileNavOpen);
   const setOpen = useUiStore((s) => s.setMobileNavOpen);
   const pathname = usePathname();
+  const t = useT();
   useEffect(() => setOpen(false), [pathname, setOpen]);
 
   return (
     <Drawer open={open} onOpenChange={setOpen} side="left" title="Menu">
       <nav aria-label="Mobile" className="px-6 py-8">
         <ul className="space-y-5">
-          {[{ label: "Home", href: "/" }, ...mainNav].map((item) => (
+          {[{ key: "nav.home", href: "/" } as const, ...mainNav].map((item) => (
             <li key={item.href}>
               <Link href={item.href} className="text-3xl font-medium tracking-tight">
-                {item.label}
+                {t(item.key)}
               </Link>
             </li>
           ))}

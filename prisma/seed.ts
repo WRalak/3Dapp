@@ -176,6 +176,8 @@ async function seedCatalogue() {
         brandId: brands.get(p.brand)!,
         categoryId: cats.get(p.category)!,
         status: "PUBLISHED",
+        sellerId: "house-seller",
+        approvalStatus: "APPROVED",
         isFeatured: !!p.featured,
         garmentKind: p.kind,
         priceCents: p.price * 100,

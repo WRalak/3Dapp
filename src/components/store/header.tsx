@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Heart, User } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/guards";
+import { getT } from "@/i18n/server";
 import { mainNav, site } from "@/config/site";
 import { CartButton, MobileNavButton, SearchButton } from "./header-client";
 import { CartDrawer } from "./cart-drawer";
@@ -8,7 +9,7 @@ import { MobileNav } from "./mobile-nav";
 import { SearchDialog } from "./search-dialog";
 
 export async function Header() {
-  const user = await getCurrentUser();
+  const [user, t] = await Promise.all([getCurrentUser(), getT()]);
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-transparent bg-ivory/90 backdrop-blur-md supports-[backdrop-filter]:bg-ivory/75">
@@ -20,7 +21,7 @@ export async function Header() {
                 {mainNav.map((item) => (
                   <li key={item.href}>
                     <Link href={item.href} className="link-underline text-[13px] tracking-wide text-graphite hover:text-ink">
-                      {item.label}
+                      {t(item.key)}
                     </Link>
                   </li>
                 ))}

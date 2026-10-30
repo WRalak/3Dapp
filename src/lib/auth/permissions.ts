@@ -35,6 +35,16 @@ export const PERMISSIONS = {
   "roles.manage": { group: "Staff", description: "Edit roles and permissions" },
   "audit.view": { group: "Staff", description: "View the audit log" },
   "settings.manage": { group: "Settings", description: "Manage store settings" },
+
+  "sellers.view": { group: "Marketplace", description: "View sellers, applications and documents" },
+  "sellers.manage": { group: "Marketplace", description: "Approve, reject, suspend and reactivate sellers" },
+  "sellers.commission": { group: "Marketplace", description: "Configure seller and category commissions" },
+  "products.approve": { group: "Marketplace", description: "Approve or reject seller product listings" },
+  "reports.manage": { group: "Marketplace", description: "Review reported listings" },
+  "delivery.manage": { group: "Marketplace", description: "Manage counties and delivery settings" },
+
+  "finance.view": { group: "Finance", description: "View GMV, commissions, ledger and payouts" },
+  "finance.payouts": { group: "Finance", description: "Process seller payouts and reconcile payments" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -42,6 +52,8 @@ export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
 
 export const ROLE_KEYS = [
   "CUSTOMER",
+  "SELLER",
+  "FINANCE_MANAGER",
   "SUPER_ADMIN",
   "ADMIN",
   "INVENTORY_MANAGER",
@@ -51,10 +63,21 @@ export const ROLE_KEYS = [
 ] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
 
-export const STAFF_ROLE_KEYS = ROLE_KEYS.filter((r) => r !== "CUSTOMER");
+/** Roles that grant access to /admin. SELLER is a marketplace role (seller portal), not staff. */
+export const STAFF_ROLE_KEYS = ROLE_KEYS.filter((r) => r !== "CUSTOMER" && r !== "SELLER");
 
 export const DEFAULT_ROLES: Record<RoleKey, { name: string; description: string; permissions: Permission[] }> = {
   CUSTOMER: { name: "Customer", description: "Storefront customer — no admin access", permissions: [] },
+  SELLER: {
+    name: "Seller",
+    description: "Approved marketplace seller — seller portal only, scoped to their own business",
+    permissions: [],
+  },
+  FINANCE_MANAGER: {
+    name: "Finance manager",
+    description: "GMV, commissions, ledger, payouts and payment reconciliation",
+    permissions: ["dashboard.view", "analytics.view", "finance.view", "finance.payouts", "orders.view", "sellers.view", "sellers.commission"],
+  },
   SUPER_ADMIN: { name: "Super admin", description: "Unrestricted access including staff & roles", permissions: ALL_PERMISSIONS },
   ADMIN: {
     name: "Administrator",
@@ -74,12 +97,12 @@ export const DEFAULT_ROLES: Record<RoleKey, { name: string; description: string;
   CONTENT_MANAGER: {
     name: "Content manager",
     description: "Homepage, collections, promotions and editorial",
-    permissions: ["dashboard.view", "products.view", "collections.manage", "content.manage", "promotions.manage", "reviews.moderate", "assets.manage"],
+    permissions: ["dashboard.view", "products.view", "products.approve", "reports.manage", "collections.manage", "content.manage", "promotions.manage", "reviews.moderate", "assets.manage"],
   },
   CUSTOMER_SUPPORT: {
     name: "Customer support",
     description: "Read access to customers and orders",
-    permissions: ["dashboard.view", "orders.view", "customers.view"],
+    permissions: ["dashboard.view", "orders.view", "customers.view", "sellers.view"],
   },
 };
 

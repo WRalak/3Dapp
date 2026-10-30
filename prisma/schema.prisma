@@ -1,5 +1,6 @@
-// Atelier — 3D fashion commerce platform
-// Monetary values are stored as integer minor units (e.g. cents) to avoid float drift.
+// Mtindo — Kenyan 3D fashion marketplace (multi-vendor)
+// Monetary values are stored as exact integer minor units (KES cents). Never floats.
+// Per-transaction amounts use Int; cumulative wallet balances use BigInt.
 
 generator client {
   provider = "prisma-client"
@@ -24,6 +25,9 @@ model User {
   id               String     @id @default(cuid())
   email            String     @unique
   emailVerifiedAt  DateTime?
+  phone            String?    @unique
+  phoneVerifiedAt  DateTime?
+  locale           String     @default("en-KE")
   passwordHash     String?
   name             String?
   image            String?
@@ -60,6 +64,14 @@ model User {
   models3D           ProductModel3D[]
   restockAlerts      RestockSubscription[]
   couponRedemptions  CouponRedemption[]
+  seller             Seller?              @relation("SellerOwner")
+  sellerReviews      SellerVerification[] @relation("SellerReviewer")
+  follows            SellerFollow[]
+  inquiries          SellerInquiry[]
+  inquiryMessages    InquiryMessage[]
+  productReports     ProductReport[]      @relation("Reporter")
+  phoneVerifications PhoneVerification[]
+  payoutsProcessed   SellerPayout[]       @relation("PayoutProcessor")
 
   @@index([status])
   @@index([isStaff])
@@ -226,11 +238,18 @@ model Address {
   region     String?
   postalCode String?
   country    String    @db.Char(2)
+  // Kenyan delivery detail (county → town → estate/neighbourhood → building → directions)
+  countyId   String?
+  town       String?
+  estate     String?
+  building   String?
+  directions String?
   isDefault  Boolean   @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  county     County?   @relation(fields: [countyId], references: [id], onDelete: SetNull)
 
   @@index([userId])
 }
@@ -246,9 +265,13 @@ model Brand {
   description String?
   logoUrl     String?
   isFeatured  Boolean   @default(false)
+  sellerId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[]
+  seller      Seller?   @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([sellerId])
 }
 
 model Category {
@@ -260,6 +283,8 @@ model Category {
   parentId    String?
   sortOrder   Int        @default(0)
   isActive    Boolean    @default(true)
+  // Optional commission override in basis points (seller override > category > platform default)
+  commissionRateBps Int?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
@@ -273,6 +298,12 @@ enum ProductStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+enum ApprovalStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 enum GarmentKind {
@@ -296,7 +327,11 @@ model Product {
   description       String
   brandId           String
   categoryId        String
+  sellerId          String
   status            ProductStatus @default(DRAFT)
+  approvalStatus    ApprovalStatus @default(PENDING_REVIEW)
+  rejectionReason   String?
+  reviewedAt        DateTime?
   isFeatured        Boolean       @default(false)
   garmentKind       GarmentKind   @default(TOP)
   priceCents        Int
@@ -318,6 +353,9 @@ model Product {
   updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
 
+  seller        Seller                @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  reports       ProductReport[]
+  inquiries     SellerInquiry[]
   brand         Brand                 @relation(fields: [brandId], references: [id], onDelete: Restrict)
   category      Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   variants      ProductVariant[]
@@ -329,6 +367,8 @@ model Product {
   orderItems    OrderItem[]
 
   @@index([status, deletedAt])
+  @@index([sellerId, status])
+  @@index([approvalStatus])
   @@index([categoryId])
   @@index([brandId])
   @@index([isFeatured])
@@ -387,6 +427,13 @@ model ProductImage {
   @@index([productId, sortOrder])
 }
 
+/// ACCURATE: scanned/modelled from the real garment, textures may be inspected.
+/// ILLUSTRATIVE: generic silhouette only — the UI must not imply fabric accuracy.
+enum ModelRepresentation {
+  ACCURATE
+  ILLUSTRATIVE
+}
+
 enum AssetStatus {
   UPLOADING
   PROCESSING
@@ -404,6 +451,7 @@ model ProductModel3D {
   format        String // glb | gltf
   fileSize      Int         @default(0)
   status        AssetStatus @default(UPLOADING)
+  representation ModelRepresentation @default(ACCURATE)
   hasDraco      Boolean     @default(false)
   hasKtx2       Boolean     @default(false)
   hasMeshopt    Boolean     @default(false)
@@ -432,6 +480,8 @@ model Collection {
   slug         String              @unique
   description  String?
   heroImageUrl String?
+  sellerId     String?
+  isCampaign   Boolean             @default(false)
   isFeatured   Boolean             @default(false)
   isActive     Boolean             @default(true)
   sortOrder    Int                 @default(0)
@@ -440,6 +490,9 @@ model Collection {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   products     CollectionProduct[]
+  seller       Seller?             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
 }
 
 model CollectionProduct {
@@ -594,6 +647,7 @@ model Order {
   couponCode           String?
   shippingMethod       String
   shippingAddress      Json
+  countyId             String?
   notes                String?
   idempotencyKey       String        @unique
   reservationExpiresAt DateTime?
@@ -609,6 +663,8 @@ model Order {
   refunds       Refund[]
   shipments     Shipment[]
   redemption    CouponRedemption?
+  sellerOrders  SellerOrder[]
+  ledger        PlatformTransaction[]
 
   @@index([userId, placedAt])
   @@index([status, placedAt])
@@ -620,6 +676,8 @@ model Order {
 model OrderItem {
   id             String          @id @default(cuid())
   orderId        String
+  sellerOrderId  String?
+  sellerId       String?
   productId      String?
   variantId      String?
   productName    String
@@ -630,10 +688,13 @@ model OrderItem {
   quantity       Int
   totalCents     Int
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerOrder    SellerOrder?    @relation(fields: [sellerOrderId], references: [id], onDelete: SetNull)
   product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
   variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+  @@index([sellerOrderId])
+  @@index([sellerId])
   @@index([productId])
 }
 
@@ -687,6 +748,7 @@ model Payment {
   updatedAt         DateTime        @updatedAt
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   refunds           Refund[]
+  transactions      PaymentTransaction[]
 
   @@unique([provider, providerReference])
   @@index([orderId])
@@ -719,6 +781,7 @@ model Refund {
   id                String       @id @default(cuid())
   paymentId         String
   orderId           String
+  sellerOrderId     String?
   amountCents       Int
   reason            String
   status            RefundStatus @default(PENDING)
@@ -737,13 +800,17 @@ model Refund {
 enum ShipmentStatus {
   PENDING
   IN_TRANSIT
+  OUT_FOR_DELIVERY
   DELIVERED
+  FAILED
   RETURNED
 }
 
 model Shipment {
   id             String         @id @default(cuid())
   orderId        String
+  sellerOrderId  String?
+  provider       String         @default("manual") // shipping-provider adapter key
   carrier        String
   trackingNumber String?
   trackingUrl    String?
@@ -753,8 +820,11 @@ model Shipment {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerOrder    SellerOrder?   @relation(fields: [sellerOrderId], references: [id], onDelete: SetNull)
+  tracking       ShipmentTracking[]
 
   @@index([orderId])
+  @@index([sellerOrderId])
 }
 
 enum CouponType {
@@ -828,6 +898,9 @@ enum NotificationType {
   PROMOTION
   RESTOCK
   SYSTEM
+  SELLER
+  INQUIRY
+  PAYOUT
 }
 
 model Notification {
@@ -979,4 +1052,516 @@ model Job {
   createdAt   DateTime  @default(now())
 
   @@index([status, runAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Marketplace: sellers
+// ─────────────────────────────────────────────────────────────
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum SellerBusinessType {
+  DESIGNER
+  BOUTIQUE
+  BRAND
+  MANUFACTURER
+  RETAILER
+}
+
+model Seller {
+  id                String             @id @default(cuid())
+  ownerId           String             @unique
+  slug              String             @unique
+  businessName      String
+  businessType      SellerBusinessType @default(DESIGNER)
+  status            SellerStatus       @default(PENDING)
+  countyId          String?
+  town              String?
+  isFeatured        Boolean            @default(false)
+  /// Optional per-seller commission override in basis points (1000 = 10%).
+  commissionRateBps Int?
+  followerCount     Int                @default(0)
+  ratingAvg         Float              @default(0)
+  approvedAt        DateTime?
+  suspendedAt       DateTime?
+  rejectionReason   String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  owner         User                 @relation("SellerOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  county        County?              @relation(fields: [countyId], references: [id], onDelete: SetNull)
+  profile       SellerProfile?
+  documents     SellerDocument[]
+  verifications SellerVerification[]
+  products      Product[]
+  brands        Brand[]
+  collections   Collection[]
+  zones         DeliveryZone[]
+  sellerOrders  SellerOrder[]
+  wallet        SellerWallet?
+  payouts       SellerPayout[]
+  commissions   Commission[]
+  ledger        PlatformTransaction[]
+  followers     SellerFollow[]
+  inquiries     SellerInquiry[]
+
+  @@index([status])
+  @@index([countyId])
+  @@index([isFeatured])
+}
+
+model SellerProfile {
+  id                 String   @id @default(cuid())
+  sellerId           String   @unique
+  contactName        String
+  email              String
+  phone              String
+  description        String
+  logoUrl            String?
+  coverUrl           String?
+  website            String?
+  instagram          String?
+  categories         String[] // category slugs the seller trades in
+  registrationNumber String? // optional business registration (BRS)
+  kraPin             String?
+  returnPolicy       String?
+  // Payout destination (account numbers are AES-GCM encrypted at rest)
+  payoutMethod       PayoutMethod @default(MPESA)
+  payoutMpesaPhone   String?
+  payoutBankName     String?
+  payoutAccountName  String?
+  payoutAccountNumberEnc String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  seller             Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+enum SellerDocumentType {
+  BUSINESS_REGISTRATION
+  KRA_PIN
+  NATIONAL_ID
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// Private files — never served from public storage paths.
+model SellerDocument {
+  id          String             @id @default(cuid())
+  sellerId    String
+  type        SellerDocumentType
+  fileKey     String             @unique
+  fileName    String
+  contentType String
+  size        Int
+  status      DocumentStatus     @default(PENDING)
+  note        String?
+  reviewedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  seller      Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+}
+
+enum VerificationDecision {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  SUSPENDED
+  REACTIVATED
+}
+
+/// Append-only history of seller review decisions.
+model SellerVerification {
+  id         String               @id @default(cuid())
+  sellerId   String
+  decision   VerificationDecision
+  notes      String?
+  reviewerId String?
+  createdAt  DateTime             @default(now())
+  seller     Seller               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  reviewer   User?                @relation("SellerReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([sellerId, createdAt])
+}
+
+model SellerFollow {
+  userId    String
+  sellerId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sellerId])
+  @@index([sellerId])
+}
+
+enum InquiryStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model SellerInquiry {
+  id         String           @id @default(cuid())
+  sellerId   String
+  customerId String
+  productId  String?
+  subject    String
+  status     InquiryStatus    @default(OPEN)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  seller     Seller           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  customer   User             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  messages   InquiryMessage[]
+
+  @@index([sellerId, status])
+  @@index([customerId])
+}
+
+model InquiryMessage {
+  id        String        @id @default(cuid())
+  inquiryId String
+  authorId  String
+  body      String
+  createdAt DateTime      @default(now())
+  inquiry   SellerInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt])
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model ProductReport {
+  id         String       @id @default(cuid())
+  productId  String
+  reporterId String
+  reason     String
+  details    String?
+  status     ReportStatus @default(OPEN)
+  resolution String?
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
+
+model PhoneVerification {
+  id         String    @id @default(cuid())
+  userId     String
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED
+}
+
+/// Automatic campaign discounts, scoped to sellers and/or categories.
+model Promotion {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  description String?
+  imageUrl    String?
+  type        PromotionType
+  value       Int // percent or KES cents per unit
+  sellerIds   String[]
+  categoryIds String[]
+  startsAt    DateTime?
+  endsAt      DateTime?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delivery
+// ─────────────────────────────────────────────────────────────
+
+model County {
+  id        String         @id @default(cuid())
+  code      Int            @unique // official county code 1–47
+  name      String         @unique
+  slug      String         @unique
+  country   String         @default("KE") @db.Char(2)
+  isActive  Boolean        @default(true)
+  addresses Address[]
+  sellers   Seller[]
+  zones     DeliveryZoneCounty[]
+}
+
+/// A seller-defined area they deliver to (counties, optionally narrowed to towns).
+model DeliveryZone {
+  id        String               @id @default(cuid())
+  sellerId  String
+  name      String
+  towns     String[] // empty = whole counties
+  isActive  Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  seller    Seller               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  counties  DeliveryZoneCounty[]
+  methods   ShippingMethod[]
+
+  @@index([sellerId])
+}
+
+model DeliveryZoneCounty {
+  zoneId   String
+  countyId String
+  zone     DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  county   County       @relation(fields: [countyId], references: [id], onDelete: Cascade)
+
+  @@id([zoneId, countyId])
+  @@index([countyId])
+}
+
+enum DeliveryType {
+  SAME_DAY
+  NEXT_DAY
+  STANDARD
+  COURIER
+  PICKUP
+  SELLER_ARRANGED
+}
+
+model ShippingMethod {
+  id            String       @id @default(cuid())
+  zoneId        String
+  type          DeliveryType
+  name          String
+  priceCents    Int
+  freeOverCents Int?
+  minDays       Int          @default(0)
+  maxDays       Int          @default(3)
+  /// Orders after this hour (EAT, 0–23) roll to the next day for SAME_DAY.
+  cutoffHour    Int?
+  /// Shipping-provider adapter key (e.g. "manual", a courier integration).
+  provider      String       @default("manual")
+  pickupAddress String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  zone          DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  sellerOrders  SellerOrder[]
+
+  @@index([zoneId])
+}
+
+/// One seller's portion of a customer order — fulfilled, shipped and settled independently.
+model SellerOrder {
+  id                 String        @id @default(cuid())
+  orderId            String
+  sellerId           String
+  status             OrderStatus   @default(PENDING_PAYMENT)
+  subtotalCents      Int
+  discountCents      Int           @default(0) // seller-funded (promotions)
+  shippingCents      Int           @default(0)
+  totalCents         Int
+  commissionCents    Int           @default(0)
+  sellerNetCents     Int           @default(0)
+  shippingMethodId   String?
+  shippingMethodName String
+  deliveryType       DeliveryType  @default(STANDARD)
+  etaMinDays         Int           @default(0)
+  etaMaxDays         Int           @default(3)
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  earningsReleasedAt DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller             Seller        @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  shippingMethod     ShippingMethod? @relation(fields: [shippingMethodId], references: [id], onDelete: SetNull)
+  items              OrderItem[]
+  shipments          Shipment[]
+  commission         Commission?
+
+  @@unique([orderId, sellerId])
+  @@index([sellerId, status])
+  @@index([status, createdAt])
+}
+
+model ShipmentTracking {
+  id          String         @id @default(cuid())
+  shipmentId  String
+  status      ShipmentStatus
+  description String
+  location    String?
+  occurredAt  DateTime       @default(now())
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, occurredAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Finance
+// ─────────────────────────────────────────────────────────────
+
+enum PaymentTxnType {
+  INITIATE
+  CALLBACK
+  STATUS_QUERY
+  C2B_VALIDATION
+  C2B_CONFIRMATION
+  CAPTURE
+  REFUND
+}
+
+/// Every interaction with a payment provider (requests, callbacks, receipts).
+model PaymentTransaction {
+  id                String         @id @default(cuid())
+  paymentId         String?
+  provider          PaymentProvider
+  type              PaymentTxnType
+  status            String
+  providerReference String?
+  receipt           String? // e.g. M-Pesa receipt (TransID)
+  phone             String?
+  amountCents       Int?
+  raw               Json?
+  createdAt         DateTime       @default(now())
+  payment           Payment?       @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, type, receipt])
+  @@index([paymentId])
+  @@index([providerReference])
+}
+
+enum CommissionStatus {
+  ACCRUED
+  PARTIALLY_REVERSED
+  REVERSED
+}
+
+model Commission {
+  id            String           @id @default(cuid())
+  sellerOrderId String           @unique
+  sellerId      String
+  rateBps       Int
+  baseCents     Int
+  amountCents   Int
+  reversedCents Int              @default(0)
+  status        CommissionStatus @default(ACCRUED)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  sellerOrder   SellerOrder      @relation(fields: [sellerOrderId], references: [id], onDelete: Restrict)
+  seller        Seller           @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, createdAt])
+}
+
+/// Derived balances; only ever changed in the same transaction as a ledger entry.
+model SellerWallet {
+  id                String   @id @default(cuid())
+  sellerId          String   @unique
+  pendingCents      BigInt   @default(0) // earned, not yet released (awaiting delivery + hold)
+  availableCents    BigInt   @default(0) // withdrawable
+  reservedCents     BigInt   @default(0) // requested payouts not yet completed
+  lifetimeNetCents  BigInt   @default(0)
+  paidOutCents      BigInt   @default(0)
+  updatedAt         DateTime @updatedAt
+  seller            Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+enum PayoutMethod {
+  MPESA
+  BANK_TRANSFER
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model SellerPayout {
+  id            String       @id @default(cuid())
+  sellerId      String
+  amountCents   Int
+  method        PayoutMethod
+  destination   String // masked snapshot, e.g. 2547•••••678
+  status        PayoutStatus @default(REQUESTED)
+  /// Payout-provider adapter (manual today; mpesa-b2c once approved by Safaricom).
+  provider      String       @default("manual")
+  reference     String?
+  failureReason String?
+  requestedAt   DateTime     @default(now())
+  processedAt   DateTime?
+  processedById String?
+  seller        Seller       @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  processedBy   User?        @relation("PayoutProcessor", fields: [processedById], references: [id], onDelete: SetNull)
+  ledger        PlatformTransaction[]
+
+  @@index([sellerId, status])
+  @@index([status, requestedAt])
+}
+
+enum LedgerEntryType {
+  ORDER_PAYMENT // customer money received by the platform
+  SELLER_EARNING // seller's net credited to pending
+  COMMISSION // platform revenue
+  EARNING_RELEASE // pending → available
+  REFUND // money returned to the customer
+  SELLER_DEBIT // seller share clawed back on refund
+  COMMISSION_REVERSAL
+  PAYOUT // available → paid out to seller
+  PAYOUT_REVERSAL
+  ADJUSTMENT
+}
+
+/// Append-only double-entry style ledger of every money movement (trigger-protected).
+model PlatformTransaction {
+  id          String          @id @default(cuid())
+  type        LedgerEntryType
+  amountCents Int // positive = credit to the named account
+  account     String // PLATFORM_CASH | PLATFORM_REVENUE | SELLER_PENDING | SELLER_AVAILABLE | SELLER_PAID | CUSTOMER_REFUNDS
+  currency    String          @default("KES") @db.Char(3)
+  sellerId    String?
+  orderId     String?
+  sellerOrderId String?
+  payoutId    String?
+  refundId    String?
+  description String
+  actorId     String?
+  createdAt   DateTime        @default(now())
+  seller      Seller?         @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  order       Order?          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payout      SellerPayout?   @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, createdAt])
+  @@index([type, createdAt])
+  @@index([orderId])
 }
