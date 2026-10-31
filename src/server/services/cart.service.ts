@@ -12,7 +12,7 @@ import { garmentArtwork } from "@/lib/media";
 import type { CartLine, CartSellerGroup, CartView } from "@/types/cart";
 import type { GarmentKindName } from "@/types/catalog";
 
-export const CART_COOKIE = "mtindo_cart";
+export const CART_COOKIE = "3dapp_cart";
 const MAX_QTY = 20;
 
 const cartInclude = {

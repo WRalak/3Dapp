@@ -5,7 +5,7 @@
 export const LOCALES = ["en-KE", "sw"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en-KE";
-export const LOCALE_COOKIE = "mtindo_locale";
+export const LOCALE_COOKIE = "3dapp_locale";
 
 export const LOCALE_LABELS: Record<Locale, string> = { "en-KE": "English", sw: "Kiswahili" };
 /** Locale used for number/date formatting (Kiswahili formats like Kenyan English). */

@@ -103,7 +103,7 @@ export default async function SellerOrderPage({ params }: { params: Promise<{ id
               <dd className="tabular-nums">{m(so.shippingCents)}</dd>
             </div>
             <div className="flex justify-between text-taupe">
-              <dt>Mtindo commission{so.commission ? ` (${(so.commission.rateBps / 100).toFixed(1)}%)` : ""}</dt>
+              <dt>3Dapp commission{so.commission ? ` (${(so.commission.rateBps / 100).toFixed(1)}%)` : ""}</dt>
               <dd className="tabular-nums">{m(-so.commissionCents)}</dd>
             </div>
             <div className="flex justify-between border-t pt-2 font-medium">

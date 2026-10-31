@@ -20,7 +20,7 @@ export const handlers: Handlers = {
       to: user.email,
       subject: "Confirm your email",
       heading: `Welcome${user.name ? `, ${user.name.split(" ")[0]}` : ""}`,
-      paragraphs: ["Confirm your email address to finish setting up your Mtindo account. This link expires in 24 hours."],
+      paragraphs: ["Confirm your email address to finish setting up your 3Dapp account. This link expires in 24 hours."],
       cta: { label: "Confirm email", href: appUrl(`/verify-email?token=${token}`) },
     });
   },
@@ -40,9 +40,9 @@ export const handlers: Handlers = {
     const invite = await db.adminInvitation.findUniqueOrThrow({ where: { id: invitationId }, include: { invitedBy: true } });
     await sendEmail({
       to: invite.email,
-      subject: "You've been invited to Mtindo admin",
-      heading: "Join the Mtindo team",
-      paragraphs: [`${invite.invitedBy.name ?? invite.invitedBy.email} invited you to the Mtindo administration dashboard. The invitation expires in 72 hours.`],
+      subject: "You've been invited to 3Dapp admin",
+      heading: "Join the 3Dapp team",
+      paragraphs: [`${invite.invitedBy.name ?? invite.invitedBy.email} invited you to the 3Dapp administration dashboard. The invitation expires in 72 hours.`],
       cta: { label: "Accept invitation", href: appUrl(`/invite/${token}`) },
     });
   },
@@ -81,7 +81,7 @@ export const handlers: Handlers = {
     const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
     await sendEmail({
       to: user.email,
-      subject: "New sign-in to your Mtindo account",
+      subject: "New sign-in to your 3Dapp account",
       heading: "Was this you?",
       paragraphs: [`We noticed a sign-in from a new device.`, `IP address: ${ip}`, `Device: ${userAgent.slice(0, 120)}`, "If this wasn't you, reset your password and sign out other sessions immediately."],
       cta: { label: "Review security", href: appUrl("/account/security") },

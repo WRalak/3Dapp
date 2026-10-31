@@ -3,7 +3,7 @@ import { requireAdminPage } from "@/lib/auth/guards";
 import { AdminShell } from "@/components/admin/shell";
 import { logoutAction } from "@/features/auth/actions";
 
-export const metadata: Metadata = { title: { default: "Admin", template: "%s | Mtindo Admin" }, robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: { default: "Admin", template: "%s | 3Dapp Admin" }, robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

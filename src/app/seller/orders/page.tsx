@@ -28,7 +28,7 @@ export default async function SellerOrders({ searchParams }: { searchParams: Pro
   });
   return (
     <>
-      <PageHeader title="Orders" description="You only see your part of each order. Customer payment is held by Mtindo and released to you after delivery." />
+      <PageHeader title="Orders" description="You only see your part of each order. Customer payment is held by 3Dapp and released to you after delivery." />
       <nav className="mb-4 flex gap-1 border-b text-sm" aria-label="Order status">
         {TABS.map((t) => (
           <Link key={t.key} href={`/seller/orders?tab=${t.key}`} aria-current={t.key === current.key ? "page" : undefined} className={t.key === current.key ? "border-b-2 border-ink px-3 py-2" : "px-3 py-2 text-taupe hover:text-ink"}>

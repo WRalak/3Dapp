@@ -67,7 +67,7 @@ export function ContactSeller({ sellerId, sellerName, productId, signedIn }: { s
           <Field label="Message" error={errors.message?.[0]}>
             <Textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
           </Field>
-          <p className="text-xs text-taupe">For your safety, keep payments on Mtindo — never send money directly to a seller.</p>
+          <p className="text-xs text-taupe">For your safety, keep payments on 3Dapp — never send money directly to a seller.</p>
           <Button type="submit" loading={pending} className="w-full">
             Send message
           </Button>

@@ -4,7 +4,7 @@ import { site, SHIPPING_METHODS } from "@/config/site";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "About", description: "The Mtindo story, shipping, returns and sizing." };
+export const metadata: Metadata = { title: "About", description: "The 3Dapp story, shipping, returns and sizing." };
 
 export const revalidate = 3600;
 

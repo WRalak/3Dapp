@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, negotiateLocale, type Locale } from "@/config/locale";
 import { dictionaryFor, makeT } from "./index";
 
-export const LITE_COOKIE = "mtindo_lite";
+export const LITE_COOKIE = "3dapp_lite";
 
 /**
  * Locale resolution: explicit cookie (language switcher) → Accept-Language → en-KE.

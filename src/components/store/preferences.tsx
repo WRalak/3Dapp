@@ -54,7 +54,7 @@ type NetInfo = { saveData?: boolean; effectiveType?: string };
 const noopSubscribe = () => () => undefined;
 function slowConnection() {
   try {
-    if (sessionStorage.getItem("mtindo_lite_dismissed") === "1") return false;
+    if (sessionStorage.getItem("3dapp_lite_dismissed") === "1") return false;
   } catch {
     /* storage unavailable */
   }
@@ -76,7 +76,7 @@ export function LiteBanner() {
   const dismiss = () => {
     setDismissed(true);
     try {
-      sessionStorage.setItem("mtindo_lite_dismissed", "1");
+      sessionStorage.setItem("3dapp_lite_dismissed", "1");
     } catch {
       /* ignore */
     }

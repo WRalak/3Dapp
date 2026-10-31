@@ -116,7 +116,7 @@ export async function startPhoneVerification(user: AuthUser, phone: string) {
   await db.$transaction(async (tx) => {
     await tx.phoneVerification.deleteMany({ where: { userId: user.id, verifiedAt: null } });
     await tx.phoneVerification.create({ data: { userId: user.id, phone, codeHash: sha256(`${user.id}:${code}`), expiresAt: new Date(Date.now() + OTP_TTL_MS) } });
-    await enqueue("sms.send", { to: phone, message: `Your Mtindo verification code is ${code}. It expires in 10 minutes. Never share it.` }, { tx });
+    await enqueue("sms.send", { to: phone, message: `Your 3Dapp verification code is ${code}. It expires in 10 minutes. Never share it.` }, { tx });
   });
   return { sentTo: maskPhone(phone) };
 }

@@ -206,7 +206,7 @@ export async function processPayout(payoutId: string, input: { action: "paid" | 
     const provider = getPayoutProvider("mpesa-b2c");
     if (!provider.isEnabled()) throw badRequest("M-Pesa B2C is not configured — pay manually and record the reference");
     if (p.method !== "MPESA" || !p.seller.profile?.payoutMpesaPhone) throw badRequest("This payout isn't to an M-Pesa number");
-    const res = await provider.send({ payoutId: p.id, amountCents: p.amountCents, phone: p.seller.profile.payoutMpesaPhone, remarks: `Mtindo payout ${p.id.slice(-6)}` });
+    const res = await provider.send({ payoutId: p.id, amountCents: p.amountCents, phone: p.seller.profile.payoutMpesaPhone, remarks: `3Dapp payout ${p.id.slice(-6)}` });
     await db.sellerPayout.update({ where: { id: p.id }, data: { status: "PROCESSING", provider: "mpesa-b2c", reference: res.reference, processedById: actor.id } });
     await audit(actor.id, "payout.initiated", "SellerPayout", p.id, { provider: "mpesa-b2c", reference: res.reference });
     return;

@@ -1,5 +1,5 @@
 /**
- * Development seed for the Mtindo marketplace: roles/permissions, staff, the 47 counties,
+ * Development seed for the 3Dapp marketplace: roles/permissions, staff, the 47 counties,
  * Kenyan sellers in Nairobi, Mombasa, Kisumu, Nakuru, Eldoret and Thika with delivery zones,
  * a KES catalogue with variants/stock, illustrative GLB silhouettes, campaigns, coupons and
  * ~60 days of multi-seller order history settled through the real finance ledger.
@@ -172,7 +172,7 @@ const PRODUCTS: SeedProduct[] = [
   { name: "Jersey Hijab Set (3 pack)", seller: "thika-modest", category: "modest", kind: "ACCESSORY", price: 1500, colors: ["Sand", "Black"], sizes: ["ONE SIZE"], material: "Viscose jersey", composition: "95% viscose, 5% elastane", tags: ["hijab", "modest"], collections: [], description: "Three soft jersey hijabs in coordinating tones. Breathable and non-slip." },
   { name: "Modest Wide-Leg Co-ord", seller: "thika-modest", category: "modest", kind: "TROUSERS", price: 4600, sale: 3900, colors: ["Forest", "Sand"], sizes: APPAREL, material: "Crepe", composition: "100% polyester crepe", tags: ["modest", "co-ord"], collections: ["nairobi-street-style"], model: true, description: "A longline tunic and wide-leg trouser co-ord in fluid crepe." },
   { name: "Long-Sleeve Midi Dress", seller: "thika-modest", category: "women", kind: "DRESS", price: 4400, colors: ["Indigo", "Coral"], sizes: APPAREL, material: "Viscose", composition: "100% viscose", tags: ["modest", "day"], collections: [], model: true, description: "A long-sleeve tiered midi dress with a high neckline." },
-  { name: "Mtindo Essential Tee", seller: "house-seller", category: "men", kind: "TOP", price: 1500, colors: ["White", "Black", "Forest"], sizes: APPAREL, material: "Cotton jersey", composition: "100% Kenyan-grown cotton", tags: ["essentials"], collections: ["made-in-kenya"], model: true, description: "A heavyweight tee knitted and sewn in Kenya from Kenyan-grown cotton." },
+  { name: "3Dapp Essential Tee", seller: "house-seller", category: "men", kind: "TOP", price: 1500, colors: ["White", "Black", "Forest"], sizes: APPAREL, material: "Cotton jersey", composition: "100% Kenyan-grown cotton", tags: ["essentials"], collections: ["made-in-kenya"], model: true, description: "A heavyweight tee knitted and sewn in Kenya from Kenyan-grown cotton." },
 ];
 
 const MEASURE: Record<string, Record<string, number>> = {
@@ -195,8 +195,8 @@ async function seedSellers(adminId: string, password: string) {
   const allCountyIds = [...counties.values()];
   // The migration created the house store; give it to the platform admin and a proper profile.
   // (Fresh databases don't have it — the migration only creates it to own pre-existing products.)
-  const house = { ownerId: adminId, businessName: "Mtindo Select", slug: "mtindo-select", status: "APPROVED" as const, countyId: counties.get("Nairobi"), town: "Nairobi CBD", approvedAt: new Date() };
-  const houseProfile = { contactName: "Mtindo", email: "care@mtindo.co.ke", phone: "+254700000000", description: "Mtindo's own essentials, made in Kenya.", categories: ["men", "women"] };
+  const house = { ownerId: adminId, businessName: "3Dapp Select", slug: "3dapp-select", status: "APPROVED" as const, countyId: counties.get("Nairobi"), town: "Nairobi CBD", approvedAt: new Date() };
+  const houseProfile = { contactName: "3Dapp", email: "care@3dapp.example", phone: "+254700000000", description: "3Dapp's own essentials, made in Kenya.", categories: ["men", "women"] };
   const otherOwned = await db.seller.findFirst({ where: { ownerId: adminId, id: { not: "house-seller" } } });
   if (otherOwned) throw new Error("Seed admin already owns a different seller");
   await db.seller.upsert({ where: { id: "house-seller" }, update: house, create: { id: "house-seller", ...house, profile: { create: houseProfile }, wallet: { create: {} } } });
@@ -205,7 +205,7 @@ async function seedSellers(adminId: string, password: string) {
 
   const ids = new Map<string, string>([["house-seller", "house-seller"]]);
   for (const [i, s] of SELLERS.entries()) {
-    const owner = await upsertUser(`${s.key}@sellers.mtindo.test`, `${s.businessName} owner`, password, ["CUSTOMER", "SELLER"], false);
+    const owner = await upsertUser(`${s.key}@sellers.3dapp.test`, `${s.businessName} owner`, password, ["CUSTOMER", "SELLER"], false);
     const countyId = counties.get(s.county)!;
     const existing = await db.seller.findUnique({ where: { slug: s.key } });
     const seller =
@@ -226,7 +226,7 @@ async function seedSellers(adminId: string, password: string) {
           profile: {
             create: {
               contactName: `${s.businessName} team`,
-              email: `${s.key}@sellers.mtindo.test`,
+              email: `${s.key}@sellers.3dapp.test`,
               phone: `+2547120000${String(i).padStart(2, "0")}`,
               description: s.description,
               categories: s.categories,
@@ -284,7 +284,7 @@ async function seedSellers(adminId: string, password: string) {
         sellerId: "house-seller",
         name: "Kenya",
         counties: { create: allCountyIds.map((c) => ({ countyId: c })) },
-        methods: { create: [{ type: "STANDARD" as const, name: "Standard delivery", priceCents: 35000, freeOverCents: 1_000_000, minDays: 1, maxDays: 3 }, { type: "PICKUP" as const, name: "Pickup — Mtindo hub, CBD", priceCents: 0, minDays: 0, maxDays: 1, pickupAddress: "Kimathi Street, Nairobi CBD" }] },
+        methods: { create: [{ type: "STANDARD" as const, name: "Standard delivery", priceCents: 35000, freeOverCents: 1_000_000, minDays: 1, maxDays: 3 }, { type: "PICKUP" as const, name: "Pickup — 3Dapp hub, CBD", priceCents: 0, minDays: 0, maxDays: 1, pickupAddress: "Kimathi Street, Nairobi CBD" }] },
       },
     });
   }
@@ -303,7 +303,7 @@ async function seedCatalogue(sellerIds: Map<string, string>) {
     cats.set(c.slug, cat.id);
   }
   const brandFor = async (sellerKey: string) => {
-    if (sellerKey === "house-seller") return (await db.brand.upsert({ where: { slug: "mtindo-select" }, update: {}, create: { name: "Mtindo Select", slug: "mtindo-select", sellerId: "house-seller" } })).id;
+    if (sellerKey === "house-seller") return (await db.brand.upsert({ where: { slug: "3dapp-select" }, update: {}, create: { name: "3Dapp Select", slug: "3dapp-select", sellerId: "house-seller" } })).id;
     return (await db.brand.findUniqueOrThrow({ where: { slug: `${sellerKey}-label` } })).id;
   };
 
@@ -337,7 +337,7 @@ async function seedCatalogue(sellerIds: Map<string, string>) {
           { label: "Made in", value: SELLERS.find((s) => s.key === p.seller)?.town ? `${SELLERS.find((s) => s.key === p.seller)!.town}, Kenya` : "Kenya" },
         ],
         tags: p.tags,
-        seoTitle: `${p.name} | Mtindo`,
+        seoTitle: `${p.name} | 3Dapp`,
         seoDescription: p.description.slice(0, 155),
         publishedAt: new Date(now - i * 2.1 * 86400_000),
       },
@@ -406,7 +406,7 @@ async function seedContent() {
       { type: "HERO", placement: "home.hero", title: "Kenyan fashion, on the rail.", subtitle: "Made in Kenya", body: "Discover designers and boutiques from Nairobi to Mombasa. Slide along the rail, lift a piece off, turn it in your hands — then pay with M-Pesa.", ctaLabel: "Enter the 3D showroom", ctaHref: "/showroom", sortOrder: 0 },
       { type: "PROMOTION", placement: "home.promo", title: "Karibu! 10% off your first order", subtitle: "Use code KARIBU10 at checkout", ctaLabel: "Shop new arrivals", ctaHref: "/new-arrivals", sortOrder: 0 },
       { type: "BANNER", placement: "home.banner", title: "Pay with M-Pesa · Delivery to all 47 counties", subtitle: "Same-day in Nairobi & Mombasa from selected designers", sortOrder: 0 },
-      { type: "EDITORIAL", placement: "home.editorial", title: "Every piece has a maker", subtitle: "Why Mtindo", body: "Mtindo is a marketplace for independent Kenyan designers, tailors and boutiques. You see who made each piece and where, message them directly, and your M-Pesa payment is held safely until your order is on its way.", ctaLabel: "Meet the designers", ctaHref: "/designers", sortOrder: 0 },
+      { type: "EDITORIAL", placement: "home.editorial", title: "Every piece has a maker", subtitle: "Why 3Dapp", body: "3Dapp is a marketplace for independent Kenyan designers, tailors and boutiques. You see who made each piece and where, message them directly, and your M-Pesa payment is held safely until your order is on its way.", ctaLabel: "Meet the designers", ctaHref: "/designers", sortOrder: 0 },
       { type: "TESTIMONIAL", placement: "home.testimonials", title: "Wanjiru M.", body: "I found a Kisumu designer I'd never have discovered otherwise. Paid with M-Pesa, delivered to Nyeri in three days.", data: { location: "Nyeri" }, sortOrder: 0 },
       { type: "TESTIMONIAL", placement: "home.testimonials", title: "Hassan A.", body: "Same-day delivery in Nyali and the linen is beautiful. The seller answered my sizing question within the hour.", data: { location: "Mombasa" }, sortOrder: 1 },
       { type: "TESTIMONIAL", placement: "home.testimonials", title: "Achieng O.", body: "Lite mode is a lifesaver on my bundles — the shop still works perfectly on my phone.", data: { location: "Kisumu" }, sortOrder: 2 },
@@ -418,8 +418,8 @@ async function seedContent() {
       { label: "Delivery & returns", href: "/about#shipping", location: "FOOTER", group: "Help", sortOrder: 0 },
       { label: "Size guide", href: "/about#sizing", location: "FOOTER", group: "Help", sortOrder: 1 },
       { label: "Contact", href: "/about#contact", location: "FOOTER", group: "Help", sortOrder: 2 },
-      { label: "About Mtindo", href: "/about", location: "FOOTER", group: "Mtindo", sortOrder: 0 },
-      { label: "3D Showroom", href: "/showroom", location: "FOOTER", group: "Mtindo", sortOrder: 1 },
+      { label: "About 3Dapp", href: "/about", location: "FOOTER", group: "3Dapp", sortOrder: 0 },
+      { label: "3D Showroom", href: "/showroom", location: "FOOTER", group: "3Dapp", sortOrder: 1 },
     ],
   });
   await db.coupon.createMany({
@@ -438,7 +438,7 @@ async function seedPromotions(sellerIds: Map<string, string>) {
   const ankara = await db.category.findUnique({ where: { slug: "ankara" } });
   await db.promotion.createMany({
     data: [
-      { name: "Contemporary Ankara Week", slug: "ankara-week", description: "10% off Ankara & kitenge pieces — funded by Mtindo.", type: "PERCENTAGE", value: 10, categoryIds: ankara ? [ankara.id] : [], sellerIds: [], endsAt: new Date(Date.now() + 10 * 86400_000) },
+      { name: "Contemporary Ankara Week", slug: "ankara-week", description: "10% off Ankara & kitenge pieces — funded by 3Dapp.", type: "PERCENTAGE", value: 10, categoryIds: ankara ? [ankara.id] : [], sellerIds: [], endsAt: new Date(Date.now() + 10 * 86400_000) },
       { name: "Pwani Threads coastal sale", slug: "pwani-coastal-sale", description: "15% off at Pwani Threads.", type: "PERCENTAGE", value: 15, sellerIds: [sellerIds.get("pwani-threads")!], categoryIds: [], endsAt: new Date(Date.now() + 14 * 86400_000) },
     ],
   });
@@ -612,7 +612,7 @@ async function seedHistory(adminId: string) {
     await db.product.update({ where: { id: p.id }, data: { ratingAvg: agg._avg.rating ?? 0, ratingCount: agg._count._all } });
   }
   // A pending application so the approvals queue is never empty in development.
-  const applicant = await upsertUser("applicant@sellers.mtindo.test", "Nyokabi W.", "Seller-Demo-2026", ["CUSTOMER"], false);
+  const applicant = await upsertUser("applicant@sellers.3dapp.test", "Nyokabi W.", "Seller-Demo-2026", ["CUSTOMER"], false);
   if (!(await db.seller.findUnique({ where: { ownerId: applicant.id } }))) {
     await db.seller.create({
       data: {
@@ -634,17 +634,17 @@ async function seedHistory(adminId: string) {
 async function main() {
   await seedAccess();
   await seedCounties();
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@mtindo.test";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "Mtindo-Admin-2026";
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@3dapp.test";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "3Dapp-Admin-2026";
   const admin = await upsertUser(adminEmail, "Platform Admin", adminPassword, ["SUPER_ADMIN"], true);
-  await upsertUser("finance@mtindo.test", "Finance Manager", adminPassword, ["FINANCE_MANAGER"], true);
-  await upsertUser("content@mtindo.test", "Content Manager", adminPassword, ["CONTENT_MANAGER"], true);
-  await upsertUser("inventory@mtindo.test", "Inventory Lead", adminPassword, ["INVENTORY_MANAGER"], true);
-  await upsertUser("support@mtindo.test", "Support Agent", adminPassword, ["CUSTOMER_SUPPORT"], true);
-  await upsertUser("customer@mtindo.test", "Demo Customer", "Customer-Demo-2026", ["CUSTOMER"], false);
-  console.log(`✓ staff (${adminEmail}), finance/content/inventory/support, demo customer (customer@mtindo.test)`);
+  await upsertUser("finance@3dapp.test", "Finance Manager", adminPassword, ["FINANCE_MANAGER"], true);
+  await upsertUser("content@3dapp.test", "Content Manager", adminPassword, ["CONTENT_MANAGER"], true);
+  await upsertUser("inventory@3dapp.test", "Inventory Lead", adminPassword, ["INVENTORY_MANAGER"], true);
+  await upsertUser("support@3dapp.test", "Support Agent", adminPassword, ["CUSTOMER_SUPPORT"], true);
+  await upsertUser("customer@3dapp.test", "Demo Customer", "Customer-Demo-2026", ["CUSTOMER"], false);
+  console.log(`✓ staff (${adminEmail}), finance/content/inventory/support, demo customer (customer@3dapp.test)`);
   const sellerIds = await seedSellers(admin.id, "Seller-Demo-2026");
-  console.log("  sellers sign in as e.g. kitenge-house@sellers.mtindo.test / Seller-Demo-2026");
+  console.log("  sellers sign in as e.g. kitenge-house@sellers.3dapp.test / Seller-Demo-2026");
   await seedCatalogue(sellerIds);
   await seedPromotions(sellerIds);
   await seedContent();

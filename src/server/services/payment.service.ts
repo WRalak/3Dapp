@@ -58,7 +58,7 @@ export async function startPayment(orderId: string, provider: PaymentProvider, o
       customerEmail: order.email,
       customerName: order.customerName,
       phone: opts.phone ?? order.phone,
-      description: `Mtindo order ${order.number} (${order.items.length} item${order.items.length === 1 ? "" : "s"})`,
+      description: `3Dapp order ${order.number} (${order.items.length} item${order.items.length === 1 ? "" : "s"})`,
       idempotencyKey: payment.idempotencyKey,
       appUrl: env().APP_URL,
     });
@@ -236,7 +236,7 @@ function kesToCents(amount: string | number) {
 
 async function openOrderForAccount(account: string | undefined) {
   const number = (account ?? "").trim().toUpperCase();
-  if (!/^MT-\d{6}-[A-Z0-9]{5}$/.test(number)) return null;
+  if (!/^3D-\d{6}-[A-Z0-9]{5}$/.test(number)) return null;
   return db.order.findFirst({ where: { number, status: "PENDING_PAYMENT" } });
 }
 

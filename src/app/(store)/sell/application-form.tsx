@@ -104,7 +104,7 @@ export function SellerApplicationForm({ counties, categories, defaults }: { coun
         <Input placeholder="A123456789B" {...form.register("kraPin")} />
       </Field>
       <div className="sm:col-span-2">
-        <Checkbox label="I agree to the Mtindo seller terms: honest listings, original designs, and shipping within my stated delivery times." {...form.register("acceptTerms")} />
+        <Checkbox label="I agree to the 3Dapp seller terms: honest listings, original designs, and shipping within my stated delivery times." {...form.register("acceptTerms")} />
         {e.acceptTerms?.message && <p className="mt-1 text-xs text-danger">{e.acceptTerms.message}</p>}
       </div>
       <div className="sm:col-span-2">

@@ -115,7 +115,7 @@ export function AdminShell({
       <aside className={cn("fixed inset-y-0 left-0 z-40 w-[248px] flex-col bg-ink p-4 text-ivory transition-transform lg:sticky lg:top-0 lg:flex lg:h-dvh lg:translate-x-0", open ? "flex translate-x-0" : "hidden -translate-x-full lg:flex")}>
         <div className="mb-8 flex items-center justify-between px-3 pt-2">
           <Link href={root} className="text-sm font-medium uppercase tracking-[0.36em]">
-            Mtindo
+            3Dapp
           </Link>
           <span className="text-[10px] uppercase tracking-[0.16em] text-stone">{label}</span>
           <button type="button" className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
@@ -141,7 +141,7 @@ export function AdminShell({
           <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="p-2">
             <Menu className="size-5" />
           </button>
-          <span className="ml-2 text-sm font-medium uppercase tracking-[0.3em]">Mtindo {label.toLowerCase()}</span>
+          <span className="ml-2 text-sm font-medium uppercase tracking-[0.3em]">3Dapp {label.toLowerCase()}</span>
         </header>
         <main id="main" className="px-4 py-8 md:px-8 lg:px-10">
           {children}

@@ -1,10 +1,10 @@
 /** Public, non-secret storefront configuration (safe for client bundles). */
 export const site = {
-  name: "Mtindo",
+  name: "3Dapp",
   tagline: "Kenyan fashion, on the rail",
   description:
-    "Mtindo is a marketplace for Kenyan designers, boutiques and fashion brands. Browse collections on a 3D clothing rail, pay with M-Pesa and get delivery across Kenya.",
-  supportEmail: "care@mtindo.co.ke",
+    "3Dapp is a marketplace for Kenyan designers, boutiques and fashion brands. Browse collections on a 3D clothing rail, pay with M-Pesa and get delivery across Kenya.",
+  supportEmail: "care@3dapp.example",
   supportPhone: "+254 700 000 000",
   social: { instagram: "https://instagram.com", tiktok: "https://tiktok.com" },
 } as const;

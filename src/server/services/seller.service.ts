@@ -240,7 +240,7 @@ export async function decideSeller(id: string, decision: SellerDecision, notes: 
       await tx.userRole.upsert({ where: { userId_roleId: { userId: seller.ownerId, roleId: sellerRole.id } }, create: { userId: seller.ownerId, roleId: sellerRole.id }, update: {} });
     }
     const messages: Record<string, [string, string]> = {
-      approve: ["Your store is approved", "Welcome to Mtindo! You can now list products from your seller dashboard."],
+      approve: ["Your store is approved", "Welcome to 3Dapp! You can now list products from your seller dashboard."],
       reject: ["Your seller application", `Unfortunately we couldn't approve your application: ${notes}`],
       requestChanges: ["Changes requested", `Please update your application: ${notes}`],
       suspend: ["Your store is suspended", `Your products are hidden while we review your account: ${notes}`],

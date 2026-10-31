@@ -202,7 +202,7 @@ describe("M-Pesa C2B (Paybill)", () => {
   it("validates account number and amount, confirms once per receipt", async () => {
     const order = await openOrder();
     const kes = Math.ceil(order.totalCents / 100); // M-Pesa moves whole shillings
-    expect(await validateC2b({ TransID: "X", TransAmount: kes, BillRefNumber: "MT-000000-AAAAA" })).toMatchObject({ ok: false, code: "C2B00012" });
+    expect(await validateC2b({ TransID: "X", TransAmount: kes, BillRefNumber: "3D-000000-AAAAA" })).toMatchObject({ ok: false, code: "C2B00012" });
     expect(await validateC2b({ TransID: "X", TransAmount: kes - 1, BillRefNumber: order.number })).toMatchObject({ ok: false, code: "C2B00013" });
     expect(await validateC2b({ TransID: "X", TransAmount: kes, BillRefNumber: order.number.toLowerCase() })).toMatchObject({ ok: true });
 

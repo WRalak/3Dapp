@@ -32,7 +32,7 @@ export default async function Promotions() {
     <>
       <PageHeader
         title="Campaigns"
-        description="Automatic discounts. Seller-scoped campaigns are funded by those sellers (agree with them first); platform-wide ones are absorbed by Mtindo and never reduce seller earnings."
+        description="Automatic discounts. Seller-scoped campaigns are funded by those sellers (agree with them first); platform-wide ones are absorbed by 3Dapp and never reduce seller earnings."
         actions={<FormDialog title="New campaign" trigger={<Button>New campaign</Button>} fields={fields} defaults={{ name: "", type: "PERCENTAGE", value: 10, endsAt: "", sellerIds: [], categoryIds: [], description: "", isActive: true }} action={savePromotionAction} />}
       />
       {promos.length === 0 ? (

@@ -9,7 +9,7 @@ import { formatMoney } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/form-controls";
 import type { CartDeliveryOption } from "@/types/cart";
 
-const KEY = "mtindo_county";
+const KEY = "3dapp_county";
 const noopSubscribe = () => () => undefined;
 function readStoredCounty() {
   try {

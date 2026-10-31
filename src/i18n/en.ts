@@ -11,7 +11,7 @@ export const en = {
   "nav.cart": "Bag",
   "nav.account": "Account",
   "nav.signIn": "Sign in",
-  "nav.sell": "Sell on Mtindo",
+  "nav.sell": "Sell on 3Dapp",
   "nav.menu": "Menu",
   "nav.search": "Search",
 
@@ -46,7 +46,7 @@ export const en = {
   "home.showroomLite": "The 3D showroom is paused in Lite mode.",
   "home.testimonials": "From our customers",
   "home.newsletterTitle": "First look at every drop",
-  "home.newsletterEyebrow": "The Mtindo letter",
+  "home.newsletterEyebrow": "The 3Dapp letter",
 
   "product.addToBag": "Add to bag",
   "product.addedToBag": "Added to your bag",
@@ -100,7 +100,7 @@ export const en = {
   "checkout.held": "Your items are held for 30 minutes while you pay.",
 
   "footer.shop": "Shop",
-  "footer.company": "Mtindo",
+  "footer.company": "3Dapp",
   "footer.help": "Help",
   "footer.newsletter": "Newsletter",
   "footer.sell": "Sell",
@@ -121,7 +121,7 @@ export const en = {
   "designers.noneInCounty": "No designers are based in this county yet — many still deliver there. Try all counties.",
   "designers.featured": "Featured",
   "designers.pieces": "{count} pieces",
-  "designers.since": "On Mtindo since {date}",
+  "designers.since": "On 3Dapp since {date}",
   "designers.collection": "The collection",
   "designers.noProducts": "No pieces listed yet",
   "designers.delivery": "Delivery",

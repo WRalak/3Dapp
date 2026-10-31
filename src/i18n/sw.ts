@@ -13,7 +13,7 @@ export const sw: Dictionary = {
   "nav.cart": "Kikapu",
   "nav.account": "Akaunti",
   "nav.signIn": "Ingia",
-  "nav.sell": "Uza kwenye Mtindo",
+  "nav.sell": "Uza kwenye 3Dapp",
   "nav.menu": "Menyu",
   "nav.search": "Tafuta",
 
@@ -48,7 +48,7 @@ export const sw: Dictionary = {
   "home.showroomLite": "Chumba cha 3D kimesitishwa katika hali nyepesi.",
   "home.testimonials": "Kutoka kwa wateja wetu",
   "home.newsletterTitle": "Kuwa wa kwanza kuona mapya",
-  "home.newsletterEyebrow": "Barua ya Mtindo",
+  "home.newsletterEyebrow": "Barua ya 3Dapp",
 
   "product.addToBag": "Weka kwenye kikapu",
   "product.addedToBag": "Imewekwa kwenye kikapu",
@@ -102,7 +102,7 @@ export const sw: Dictionary = {
   "checkout.held": "Bidhaa zako zimehifadhiwa kwa dakika 30 unapolipa.",
 
   "footer.shop": "Duka",
-  "footer.company": "Mtindo",
+  "footer.company": "3Dapp",
   "footer.help": "Msaada",
   "footer.newsletter": "Jarida",
   "footer.sell": "Uza",
@@ -123,7 +123,7 @@ export const sw: Dictionary = {
   "designers.noneInCounty": "Bado hakuna wabunifu walioko kaunti hii — wengi bado hufikisha huko. Jaribu kaunti zote.",
   "designers.featured": "Walioangaziwa",
   "designers.pieces": "Mavazi {count}",
-  "designers.since": "Kwenye Mtindo tangu {date}",
+  "designers.since": "Kwenye 3Dapp tangu {date}",
   "designers.collection": "Mkusanyiko",
   "designers.noProducts": "Bado hakuna mavazi",
   "designers.delivery": "Usafirishaji",

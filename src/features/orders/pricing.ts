@@ -112,13 +112,13 @@ export function computeTotals(input: TotalsInput): Totals {
   };
 }
 
-/** Human-friendly order number: MT-YYMMDD-XXXXX in East Africa Time (no ambiguous characters). Also the M-Pesa Paybill account number. */
+/** Human-friendly order number: 3D-YYMMDD-XXXXX in East Africa Time (no ambiguous characters). Also the M-Pesa Paybill account number. */
 export function generateOrderNumber(now = new Date(), rand: () => number = Math.random) {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const suffix = Array.from({ length: 5 }, () => alphabet[Math.floor(rand() * alphabet.length)]).join("");
   const eat = new Date(now.getTime() + 3 * 3600_000);
   const d = eat.toISOString().slice(2, 10).replace(/-/g, "");
-  return `MT-${d}-${suffix}`;
+  return `3D-${d}-${suffix}`;
 }
 
 export interface MarketplaceTotalsInput {

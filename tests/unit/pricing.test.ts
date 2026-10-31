@@ -106,6 +106,6 @@ describe("shipping & order numbers", () => {
   it("throws for unknown shipping methods", () => expect(() => shippingFor("teleport" as never, 0)).toThrow());
   it("generates readable, unambiguous order numbers", () => {
     const n = generateOrderNumber(new Date("2026-10-30T10:00:00Z"));
-    expect(n).toMatch(/^MT-261030-[A-HJ-NP-Z2-9]{5}$/);
+    expect(n).toMatch(/^3D-261030-[A-HJ-NP-Z2-9]{5}$/);
   });
 });

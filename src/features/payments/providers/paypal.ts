@@ -73,7 +73,7 @@ export const paypalAdapter: PaymentAdapter = {
         intent: "CAPTURE",
         purchase_units: [{ reference_id: ctx.orderNumber, custom_id: ctx.paymentId, description: ctx.description.slice(0, 127), amount: money(ctx.amountCents, ctx.currency) }],
         application_context: {
-          brand_name: "Mtindo",
+          brand_name: "3Dapp",
           user_action: "PAY_NOW",
           return_url: `${ctx.appUrl}/api/payments/paypal/return?paymentId=${ctx.paymentId}`,
           cancel_url: `${ctx.appUrl}/orders/${ctx.orderNumber}/confirmation?cancelled=1`,

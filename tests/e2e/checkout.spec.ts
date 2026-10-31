@@ -8,7 +8,7 @@ async function contact(page: import("@playwright/test").Page, email: string) {
 }
 
 test("guest checkout: Kenyan address, per-seller delivery, sandbox payment → paid order", async ({ page }) => {
-  await addToBag(page, "mtindo-essential-tee");
+  await addToBag(page, "3dapp-essential-tee");
   await page.goto("/checkout");
   await expect(page.getByRole("button", { name: /Place order/ })).toBeVisible();
   await contact(page, "e2e-guest@example.com");
@@ -22,25 +22,25 @@ test("guest checkout: Kenyan address, per-seller delivery, sandbox payment → p
 
   await expect(page).toHaveURL(/\/checkout\/sandbox\//);
   await page.getByRole("button", { name: "Approve payment" }).click();
-  await expect(page).toHaveURL(/\/orders\/MT-\d{6}-[A-Z0-9]{5}\/confirmation/);
+  await expect(page).toHaveURL(/\/orders\/3D-\d{6}-[A-Z0-9]{5}\/confirmation/);
   await expect(page.getByRole("heading", { name: /confirmed/ })).toBeVisible();
 });
 
 test("a bag from two designers asks for delivery from each", async ({ page }) => {
-  await addToBag(page, "mtindo-essential-tee");
+  await addToBag(page, "3dapp-essential-tee");
   await addToBag(page, "kitenge-shirt-short-sleeve");
   await page.goto("/cart");
   await expect(page.getByText("ships separately")).toHaveCount(2);
   await page.goto("/checkout");
   await fillKenyanAddress(page);
   await expect(page.getByRole("group", { name: /Kitenge House/ })).toBeVisible();
-  await expect(page.getByRole("group", { name: /Mtindo Select/ })).toBeVisible();
+  await expect(page.getByRole("group", { name: /3Dapp Select/ })).toBeVisible();
   // Kitenge House (Nairobi) offers same-day riders inside Nairobi.
   await expect(page.getByRole("group", { name: /Kitenge House/ }).getByText(/Same-day rider/)).toBeVisible();
 });
 
 test("checkout validates required fields before submitting", async ({ page }) => {
-  await addToBag(page, "mtindo-essential-tee");
+  await addToBag(page, "3dapp-essential-tee");
   await page.goto("/checkout");
   await fillKenyanAddress(page);
   await page.getByRole("radio", { name: /Standard delivery/ }).check();
@@ -50,7 +50,7 @@ test("checkout validates required fields before submitting", async ({ page }) =>
 });
 
 test("declined payments can be retried", async ({ page }) => {
-  await addToBag(page, "mtindo-essential-tee");
+  await addToBag(page, "3dapp-essential-tee");
   await page.goto("/checkout");
   await contact(page, "e2e-decline@example.com");
   await fillKenyanAddress(page);

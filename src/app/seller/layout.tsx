@@ -3,7 +3,7 @@ import { requireSellerPage } from "@/lib/auth/seller-guard";
 import { AdminShell } from "@/components/admin/shell";
 import { logoutAction } from "@/features/auth/actions";
 
-export const metadata: Metadata = { title: { default: "Seller", template: "%s | Mtindo Seller" }, robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: { default: "Seller", template: "%s | 3Dapp Seller" }, robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 /** Seller portal: every page below re-resolves the seller from the session (never from the URL). */

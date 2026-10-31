@@ -4,7 +4,7 @@ Status of each phase in the brief, with how it was verified. Everything listed a
 
 ## Kenyan marketplace (second brief)
 
-The single-vendor store was converted into **Mtindo**, a multi-vendor marketplace for Kenya. A data-preserving migration moved existing products and orders onto a house seller. Design notes are in [MARKETPLACE.md](MARKETPLACE.md).
+The single-vendor store was converted into **3Dapp**, a multi-vendor marketplace for Kenya. A data-preserving migration moved existing products and orders onto a house seller. Design notes are in [MARKETPLACE.md](MARKETPLACE.md).
 
 | Phase | Status | Notes |
 |---|---|---|
@@ -26,7 +26,7 @@ The single-vendor store was converted into **Mtindo**, a multi-vendor marketplac
 - **Integration (60, real Postgres):** multi-seller checkout with per-seller commission; a balanced ledger on payment; idempotent settlement; platform-funded coupons absorbed by the platform; checkout refused for uncovered counties (pickup still offered); seller isolation (foreign product edit and fulfilment → 404; pending sellers blocked); visibility of unapproved listings and suspended sellers; earnings release after the hold; payout reservation, overdraw rejection, KYC (accepted national ID) and a reference required before paying, wallets reconciling to the ledger; refunds reversing commission; C2B validation (account, amount), receipt idempotency, unmatched payments parked; permissions for finance, content, support and seller roles.
 - **Seed:** run against a fresh database. It produced 47 counties, 7 sellers and 27 products, plus 81 multi-seller orders settled through `settlePaidOrder`. All 8 wallets reconciled to the ledger, which balanced. A re-run is idempotent.
 - **E2E (42 Playwright runs, all passing across desktop, Pixel 7 touch and WebGL disabled):**
-  - Kenyan guest checkout (county, town, estate; per-seller delivery; sandbox payment) to a paid `MT-…` order;
+  - Kenyan guest checkout (county, town, estate; per-seller delivery; sandbox payment) to a paid `3D-…` order;
   - a two-designer bag requiring a delivery choice per designer, including the Nairobi same-day rider;
   - validation, and declined-payment retry via pickup;
   - product pages showing the seller, KES prices, a delivery check for a remote county and the illustrative-3D notice;

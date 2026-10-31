@@ -51,7 +51,7 @@ const schema = z.object({
   CDN_URL: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
 
-  EMAIL_FROM: z.string().default("Mtindo <no-reply@mtindo.co.ke>"),
+  EMAIL_FROM: z.string().default("3Dapp <no-reply@3dapp.example>"),
   SMTP_URL: z.string().optional(),
 
   // Payments

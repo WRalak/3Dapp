@@ -9,7 +9,7 @@ import { env } from "@/config/env";
 import { Button } from "@/components/ui/button";
 import { SellerApplicationForm } from "./application-form";
 
-export const metadata: Metadata = { title: "Sell on Mtindo", description: "Open your store on Kenya's 3D fashion marketplace. Reach customers across all 47 counties and get paid to M-Pesa." };
+export const metadata: Metadata = { title: "Sell on 3Dapp", description: "Open your store on Kenya's 3D fashion marketplace. Reach customers across all 47 counties and get paid to M-Pesa." };
 export const dynamic = "force-dynamic";
 
 export default async function SellPage() {
@@ -20,7 +20,7 @@ export default async function SellPage() {
 
   const perks = [
     { icon: Users, title: "Reach all 47 counties", body: "Your store page, follows, and a place on the 3D rail beside Kenya's best designers." },
-    { icon: Smartphone, title: "Paid to M-Pesa", body: `Customers pay Mtindo; you receive your earnings (less ${commission}% commission) after delivery.` },
+    { icon: Smartphone, title: "Paid to M-Pesa", body: `Customers pay 3Dapp; you receive your earnings (less ${commission}% commission) after delivery.` },
     { icon: Truck, title: "Your delivery, your way", body: "Set your own zones, prices and times — same-day in your town, courier upcountry, or pickup." },
     { icon: BadgeCheck, title: "Trusted marketplace", body: "Every seller and listing is reviewed, so customers buy with confidence." },
   ];
@@ -29,7 +29,7 @@ export default async function SellPage() {
     <div className="container-luxe pt-10 md:pt-16">
       <div className="grid gap-12 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <p className="eyebrow text-taupe">Sell on Mtindo</p>
+          <p className="eyebrow text-taupe">Sell on 3Dapp</p>
           <h1 className="mt-3 text-headline font-medium">Open your store</h1>
           <p className="mt-4 text-graphite">Join independent Kenyan designers, tailors and boutiques selling to customers nationwide. Applications are reviewed within 2 business days.</p>
           <ul className="mt-10 space-y-6">
@@ -54,7 +54,7 @@ export default async function SellPage() {
           ) : (
             <div className="text-center">
               <h2 className="text-2xl font-medium">Create an account to apply</h2>
-              <p className="mt-2 text-sm text-graphite">Your seller account is linked to your Mtindo login.</p>
+              <p className="mt-2 text-sm text-graphite">Your seller account is linked to your 3Dapp login.</p>
               <div className="mt-6 flex justify-center gap-3">
                 <Button asChild>
                   <Link href="/register?next=/sell">Create account</Link>

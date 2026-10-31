@@ -1,4 +1,4 @@
-// Mtindo — Kenyan 3D fashion marketplace (multi-vendor)
+// 3Dapp — Kenyan 3D fashion marketplace (multi-vendor)
 // Monetary values are stored as exact integer minor units (KES cents). Never floats.
 // Per-transaction amounts use Int; cumulative wallet balances use BigInt.
 

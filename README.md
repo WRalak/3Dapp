@@ -1,6 +1,6 @@
-# Mtindo: Kenyan 3D fashion marketplace
+# 3Dapp: Kenyan 3D fashion marketplace
 
-Mtindo is a multi-vendor fashion marketplace for Kenya. Independent designers, tailors and boutiques sell through one storefront; shoppers browse a **3D clothing rail** (or a light 2D shop on slow connections), pay once with **M-Pesa**, card or PayPal, and each designer delivers their own pieces. The same Next.js app includes a **seller portal** and a permission-based **admin** for seller verification, listing moderation, finance and payouts.
+3Dapp is a multi-vendor fashion marketplace for Kenya. Independent designers, tailors and boutiques sell through one storefront; shoppers browse a **3D clothing rail** (or a light 2D shop on slow connections), pay once with **M-Pesa**, card or PayPal, and each designer delivers their own pieces. The same Next.js app includes a **seller portal** and a permission-based **admin** for seller verification, listing moderation, finance and payouts.
 
 | | |
 |---|---|
@@ -56,13 +56,13 @@ Open <http://localhost:3000>.
 
 | Seeded account | Email | Password |
 |---|---|---|
-| Super admin | `admin@mtindo.test` | `Mtindo-Admin-2026` |
-| Finance manager | `finance@mtindo.test` | `Mtindo-Admin-2026` |
-| Content manager (approvals, reports) | `content@mtindo.test` | `Mtindo-Admin-2026` |
-| Seller (Kitenge House, Nairobi) | `kitenge-house@sellers.mtindo.test` | `Seller-Demo-2026` |
+| Super admin | `admin@3dapp.test` | `3Dapp-Admin-2026` |
+| Finance manager | `finance@3dapp.test` | `3Dapp-Admin-2026` |
+| Content manager (approvals, reports) | `content@3dapp.test` | `3Dapp-Admin-2026` |
+| Seller (Kitenge House, Nairobi) | `kitenge-house@sellers.3dapp.test` | `Seller-Demo-2026` |
 | Other sellers | `pwani-threads@…`, `lakeside-atelier@…`, `rift-tailors@…`, `eldoret-leatherworks@…`, `thika-modest@…` (same domain) | `Seller-Demo-2026` |
-| Pending applicant | `applicant@sellers.mtindo.test` | `Seller-Demo-2026` |
-| Customer | `customer@mtindo.test` | `Customer-Demo-2026` |
+| Pending applicant | `applicant@sellers.3dapp.test` | `Seller-Demo-2026` |
+| Customer | `customer@3dapp.test` | `Customer-Demo-2026` |
 
 The seed creates:
 

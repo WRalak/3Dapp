@@ -1,8 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 
-export const ADMIN = { email: process.env.SEED_ADMIN_EMAIL ?? "admin@mtindo.test", password: process.env.SEED_ADMIN_PASSWORD ?? "Mtindo-Admin-2026" };
-export const SELLER = { email: "kitenge-house@sellers.mtindo.test", password: "Seller-Demo-2026" };
-export const CUSTOMER = { email: "customer@mtindo.test", password: "Customer-Demo-2026" };
+export const ADMIN = { email: process.env.SEED_ADMIN_EMAIL ?? "admin@3dapp.test", password: process.env.SEED_ADMIN_PASSWORD ?? "3Dapp-Admin-2026" };
+export const SELLER = { email: "kitenge-house@sellers.3dapp.test", password: "Seller-Demo-2026" };
+export const CUSTOMER = { email: "customer@3dapp.test", password: "Customer-Demo-2026" };
 
 export async function login(page: Page, email: string, password: string) {
   await page.goto("/login");

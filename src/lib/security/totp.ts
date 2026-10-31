@@ -62,7 +62,7 @@ export function verifyTotp(secret: string, code: string, at = Date.now()): boole
   return [-1, 0, 1].some((d) => hotp(secret, counter + d) === code);
 }
 
-export function totpUri(secret: string, account: string, issuer = "Mtindo Admin"): string {
+export function totpUri(secret: string, account: string, issuer = "3Dapp Admin"): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
   return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }

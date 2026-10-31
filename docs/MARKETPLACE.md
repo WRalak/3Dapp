@@ -1,6 +1,6 @@
 # Marketplace design (Kenya)
 
-Mtindo is a multi-vendor marketplace: independent Kenyan designers, tailors and boutiques sell through one storefront, customers pay Mtindo once (M-Pesa, card or PayPal), and Mtindo pays each seller their share after delivery. This document explains how that works and why.
+3Dapp is a multi-vendor marketplace: independent Kenyan designers, tailors and boutiques sell through one storefront, customers pay 3Dapp once (M-Pesa, card or PayPal), and 3Dapp pays each seller their share after delivery. This document explains how that works and why.
 
 ## Sellers
 
@@ -18,7 +18,7 @@ Mtindo is a multi-vendor marketplace: independent Kenyan designers, tailors and 
 ## Orders: one payment, many sellers
 
 ```
-Order (what the customer pays: MT-YYMMDD-XXXXX)
+Order (what the customer pays: 3D-YYMMDD-XXXXX)
  ├─ SellerOrder  Kitenge House   items · delivery (same-day rider) · commission · seller net
  └─ SellerOrder  Pwani Threads   items · delivery (courier)        · commission · seller net
 ```
