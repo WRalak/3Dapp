@@ -17,6 +17,9 @@ const remoteHosts = [process.env.S3_PUBLIC_URL, process.env.CDN_URL]
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Pin the project root: a lockfile in a parent folder (e.g. a clone nested inside another
+  // checkout) must not change module resolution or file watching.
+  turbopack: { root: process.cwd() },
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["@node-rs/argon2", "pino", "ioredis", "pg"],

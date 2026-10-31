@@ -90,7 +90,10 @@ const schema = z.object({
 export type Env = z.infer<typeof schema>;
 
 function load(): Env {
-  const parsed = schema.safeParse(process.env);
+  // Treat blank values (e.g. `MPESA_KES_RATE=` copied from .env.example) as unset, so
+  // optional settings fall back to their defaults instead of failing validation.
+  const present = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const parsed = schema.safeParse(present);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration:\n${issues}`);
